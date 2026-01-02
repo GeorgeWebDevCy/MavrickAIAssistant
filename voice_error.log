@@ -1,0 +1,9 @@
+﻿pygame 2.6.1 (SDL 2.28.4, Python 3.13.9)
+Hello from the pygame community. https://www.pygame.org/contribute.html
+Initializing VoiceEngine...
+OpenAI API Key detected.
+Attempting to speak...
+Mavrick: Testing high quality voice system. Can you hear me, Sir?
+TTS Error: AuthenticationError("Error code: 401 - {'error': {'message': 'Incorrect API key provided: sk-proj-********************************************************************************************************************************************************2zwA. You can find your API key at https://platform.openai.com/account/api-keys.', 'type': 'invalid_request_error', 'code': 'invalid_api_key', 'param': None}, 'status': 401}")
+Mavrick (Text Only): Testing high quality voice system. Can you hear me, Sir?
+Voice command completed.

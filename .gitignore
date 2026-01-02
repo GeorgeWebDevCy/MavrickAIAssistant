@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+.env
+
+# UI Audio Temp
+*.mp3
+*.wav
+!assets/*.wav
+
+# IDEs
+.vscode/
+.idea/

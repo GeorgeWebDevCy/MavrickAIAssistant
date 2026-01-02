@@ -1,0 +1,128 @@
+﻿python : Traceback (mo
+st recent call last):
+At line:1 char:26
++ .\venv\Scripts\activ
+ate; python main.py 2>
+&1 | Out-File -FilePat
+h err ...
++                     
+     ~~~~~~~~~~~~~~~~~
+~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (Traceback    
+ (most recent call    
+ last)::String) [    ]
+, RemoteExceptio    n
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+  File "C:\Users\georg
+\OneDrive\Desktop\Mavr
+ickAIAssistant\main.py
+", line 9, in <module>
+    from engine.brain 
+import MavrickBrain
+  File "C:\Users\georg
+\OneDrive\Desktop\Mavr
+ickAIAssistant\engine\
+brain.py", line 7, in 
+<module>
+    load_dotenv()
+    ~~~~~~~~~~~^^
+  File "C:\Users\georg
+\OneDrive\Desktop\Mavr
+ickAIAssistant\venv\Li
+b\site-packages\dotenv
+\main.py", line 384, i
+n load_dotenv
+    return dotenv.set_
+as_environment_variabl
+es()
+           ~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~^^
+  File "C:\Users\georg
+\OneDrive\Desktop\Mavr
+ickAIAssistant\venv\Li
+b\site-packages\dotenv
+\main.py", line 104, i
+n set_as_environment_v
+ariables
+    if not self.dict()
+:
+           ~~~~~~~~~^^
+  File "C:\Users\georg
+\OneDrive\Desktop\Mavr
+ickAIAssistant\venv\Li
+b\site-packages\dotenv
+\main.py", line 87, in
+ dict
+    resolve_variables(
+raw_values, override=s
+elf.override)
+    ~~~~~~~~~~~~~~~~~^
+^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^
+  File "C:\Users\georg
+\OneDrive\Desktop\Mavr
+ickAIAssistant\venv\Li
+b\site-packages\dotenv
+\main.py", line 250, i
+n resolve_variables
+    for name, value in
+ values:
+                      
+ ^^^^^^
+  File "C:\Users\georg
+\OneDrive\Desktop\Mavr
+ickAIAssistant\venv\Li
+b\site-packages\dotenv
+\main.py", line 96, in
+ parse
+    for mapping in wit
+h_warn_for_invalid_lin
+es(parse_stream(stream
+)):
+                   ~~~
+~~~~~~~~~~~~~~~~~~~~~~
+~~^^^^^^^^^^^^^^^^^^^^
+^^
+  File "C:\Users\georg
+\OneDrive\Desktop\Mavr
+ickAIAssistant\venv\Li
+b\site-packages\dotenv
+\main.py", line 36, in
+ with_warn_for_invalid
+_lines
+    for mapping in map
+pings:
+                   ^^^
+^^^^^
+  File "C:\Users\georg
+\OneDrive\Desktop\Mavr
+ickAIAssistant\venv\Li
+b\site-packages\dotenv
+\parser.py", line 180,
+ in parse_stream
+    reader = Reader(st
+ream)
+  File "C:\Users\georg
+\OneDrive\Desktop\Mavr
+ickAIAssistant\venv\Li
+b\site-packages\dotenv
+\parser.py", line 71, 
+in __init__
+    self.string = stre
+am.read()
+                  ~~~~
+~~~~~~~^^
+  File "<frozen codecs
+>", line 325, in decod
+e
+UnicodeDecodeError: 'u
+tf-8' codec can't deco
+de byte 0xff in positi
+on 0: invalid start by
+te
