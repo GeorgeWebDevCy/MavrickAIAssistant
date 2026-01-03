@@ -4,9 +4,12 @@ import os
 import sys
 import threading
 import time
+import tkinter as tk
+from tkinter import messagebox
 import psutil
 import numpy as np
 import pyaudio
+from engine.actions import MavrickActions
 from engine.weather import WeatherEngine
 from ctypes import windll, c_int, byref, sizeof
 import ctypes
@@ -44,7 +47,21 @@ class MavrickUI(ctk.CTk):
 
         self._icon_path = _asset_path("assets", "icon.ico")
         self._taskbar_icon = None
+        self._protocol_editor = None
+        self._action_log_window = None
+        self._action_log_text = None
+        self._reminders_window = None
+        self._reminders_text = None
+        self._reminder_id_entry = None
+        self._protocols_cache = {}
+        self._protocol_var = None
+        self._protocol_menu = None
+        self._protocol_name_entry = None
+        self._protocol_commands_text = None
         self._apply_window_icon()
+
+        MavrickActions.set_confirm_callback(self.confirm_action)
+        MavrickActions.set_audit_callback(self.audit_action)
         
         # Taskbar Icon Fix for Overrideredirect
         # GWL_EXSTYLE = -20
@@ -200,8 +217,322 @@ class MavrickUI(ctk.CTk):
         self.btn_listen = ctk.CTkButton(self, text="ENGAGE HYPERLINK", font=("Orbitron", 12, "bold"), fg_color=self.primary_cyan, text_color="black", hover_color="#00b8e6", corner_radius=5, height=40, command=self.on_engage)
         self.btn_listen.pack(pady=10, padx=40, fill="x")
         
+        self.btn_protocols = ctk.CTkButton(self, text="PROTOCOLS", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_protocol_editor)
+        self.btn_protocols.pack(pady=5, padx=40, fill="x")
+
+        self.btn_actions = ctk.CTkButton(self, text="ACTIONS LOG", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_action_log)
+        self.btn_actions.pack(pady=5, padx=40, fill="x")
+
+        self.btn_reminders = ctk.CTkButton(self, text="REMINDERS", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_reminders)
+        self.btn_reminders.pack(pady=5, padx=40, fill="x")
+
         self.btn_exit = ctk.CTkButton(self, text="TERMINATE CONNECTION", font=("Consolas", 10), fg_color="transparent", border_width=1, border_color=self.alert_red, text_color=self.alert_red, command=self.destroy)
         self.btn_exit.pack(pady=5)
+
+    def open_protocol_editor(self):
+        if self._protocol_editor and self._protocol_editor.winfo_exists():
+            self._protocol_editor.focus()
+            return
+
+        self._protocol_editor = ctk.CTkToplevel(self)
+        self._protocol_editor.title("Protocol Builder")
+        self._protocol_editor.geometry("520x420")
+        self._protocol_editor.resizable(False, False)
+        try:
+            self._protocol_editor.iconbitmap(self._icon_path)
+        except Exception:
+            pass
+
+        title = ctk.CTkLabel(self._protocol_editor, text="PROTOCOL BUILDER", font=("Orbitron", 16, "bold"), text_color=self.primary_cyan)
+        title.pack(pady=(10, 6))
+
+        selector_frame = ctk.CTkFrame(self._protocol_editor, fg_color="transparent")
+        selector_frame.pack(fill="x", padx=12, pady=(4, 6))
+
+        selector_label = ctk.CTkLabel(selector_frame, text="Select Protocol", font=("Consolas", 10), text_color=self.secondary_teal)
+        selector_label.pack(side="left")
+
+        self._protocols_cache = MavrickActions.get_protocols()
+        protocol_names = sorted(self._protocols_cache.keys())
+        self._protocol_var = tk.StringVar(value=protocol_names[0] if protocol_names else "")
+        self._protocol_menu = ctk.CTkOptionMenu(
+            selector_frame,
+            values=protocol_names if protocol_names else ["(none)"],
+            variable=self._protocol_var,
+            command=self._on_protocol_select
+        )
+        self._protocol_menu.pack(side="left", padx=8)
+
+        reload_btn = ctk.CTkButton(selector_frame, text="Reload", width=80, command=self._reload_protocols)
+        reload_btn.pack(side="right")
+
+        name_label = ctk.CTkLabel(self._protocol_editor, text="Protocol Name", font=("Consolas", 10), text_color=self.secondary_teal)
+        name_label.pack(anchor="w", padx=12, pady=(6, 2))
+
+        self._protocol_name_entry = ctk.CTkEntry(self._protocol_editor, width=360)
+        self._protocol_name_entry.pack(fill="x", padx=12)
+
+        commands_label = ctk.CTkLabel(self._protocol_editor, text="Commands (one per line)", font=("Consolas", 10), text_color=self.secondary_teal)
+        commands_label.pack(anchor="w", padx=12, pady=(10, 2))
+
+        self._protocol_commands_text = ctk.CTkTextbox(self._protocol_editor, height=180)
+        self._protocol_commands_text.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+
+        btn_frame = ctk.CTkFrame(self._protocol_editor, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=12, pady=(0, 10))
+
+        new_btn = ctk.CTkButton(btn_frame, text="New", width=90, command=self._new_protocol)
+        new_btn.pack(side="left")
+
+        save_btn = ctk.CTkButton(btn_frame, text="Save", width=90, command=self._save_protocol)
+        save_btn.pack(side="left", padx=8)
+
+        delete_btn = ctk.CTkButton(btn_frame, text="Delete", width=90, fg_color=self.alert_red, hover_color="#c23b24", command=self._delete_protocol)
+        delete_btn.pack(side="left")
+
+        close_btn = ctk.CTkButton(btn_frame, text="Close", width=90, command=self._protocol_editor.destroy)
+        close_btn.pack(side="right")
+
+        self._refresh_protocol_menu()
+
+    def _on_protocol_select(self, selected_name):
+        if selected_name and selected_name != "(none)":
+            self._load_protocol_into_editor(selected_name)
+
+    def _refresh_protocol_menu(self, select_name=None):
+        self._protocols_cache = MavrickActions.get_protocols()
+        protocol_names = sorted(self._protocols_cache.keys())
+
+        if not protocol_names:
+            self._protocol_menu.configure(values=["(none)"], state="disabled")
+            if self._protocol_var:
+                self._protocol_var.set("")
+            self._clear_protocol_editor()
+            return
+
+        self._protocol_menu.configure(values=protocol_names, state="normal")
+        name_to_load = select_name if select_name in protocol_names else protocol_names[0]
+        if self._protocol_var:
+            self._protocol_var.set(name_to_load)
+        self._load_protocol_into_editor(name_to_load)
+
+    def _load_protocol_into_editor(self, name):
+        self._clear_protocol_editor()
+        commands = self._protocols_cache.get(name, [])
+        self._protocol_name_entry.insert(0, name)
+        for cmd in commands:
+            self._protocol_commands_text.insert("end", f"{cmd}\n")
+
+    def _clear_protocol_editor(self):
+        if self._protocol_name_entry:
+            self._protocol_name_entry.delete(0, "end")
+        if self._protocol_commands_text:
+            self._protocol_commands_text.delete("1.0", "end")
+
+    def _new_protocol(self):
+        if self._protocol_var:
+            self._protocol_var.set("")
+        self._clear_protocol_editor()
+
+    def _save_protocol(self):
+        name = self._protocol_name_entry.get().strip().lower()
+        if not name:
+            messagebox.showwarning("Protocols", "Protocol name is required.")
+            return
+
+        raw_lines = self._protocol_commands_text.get("1.0", "end").splitlines()
+        commands = [line.strip() for line in raw_lines if line.strip()]
+        if not commands:
+            messagebox.showwarning("Protocols", "Add at least one command.")
+            return
+
+        MavrickActions.upsert_protocol(name, commands)
+        self._refresh_protocol_menu(select_name=name)
+
+    def _delete_protocol(self):
+        name = self._protocol_name_entry.get().strip().lower()
+        if not name:
+            messagebox.showwarning("Protocols", "Select a protocol to delete.")
+            return
+        if not messagebox.askyesno("Delete Protocol", f"Delete '{name}'?"):
+            return
+
+        MavrickActions.delete_protocol(name)
+        self._refresh_protocol_menu()
+
+    def _reload_protocols(self):
+        self._refresh_protocol_menu()
+
+    def confirm_action(self, action_type, detail):
+        if not self.winfo_exists():
+            return True
+
+        title = "Confirm Action"
+        message = f"{action_type}?\n\n{detail}"
+
+        if threading.current_thread() is threading.main_thread():
+            return messagebox.askyesno(title, message)
+
+        result = {"value": False}
+        done = threading.Event()
+
+        def _ask():
+            result["value"] = messagebox.askyesno(title, message)
+            done.set()
+
+        self.after(0, _ask)
+        done.wait()
+        return result["value"]
+
+    def audit_action(self, entry):
+        def _refresh():
+            if self._action_log_window and self._action_log_window.winfo_exists():
+                self._load_action_log()
+
+        if threading.current_thread() is threading.main_thread():
+            _refresh()
+        else:
+            self.after(0, _refresh)
+
+    def open_action_log(self):
+        if self._action_log_window and self._action_log_window.winfo_exists():
+            self._action_log_window.focus()
+            return
+
+        self._action_log_window = ctk.CTkToplevel(self)
+        self._action_log_window.title("Action Log")
+        self._action_log_window.geometry("560x360")
+        self._action_log_window.resizable(False, False)
+        try:
+            self._action_log_window.iconbitmap(self._icon_path)
+        except Exception:
+            pass
+
+        title = ctk.CTkLabel(self._action_log_window, text="ACTION LOG", font=("Orbitron", 16, "bold"), text_color=self.primary_cyan)
+        title.pack(pady=(10, 6))
+
+        self._action_log_text = ctk.CTkTextbox(self._action_log_window, height=220)
+        self._action_log_text.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+
+        btn_frame = ctk.CTkFrame(self._action_log_window, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=12, pady=(0, 10))
+
+        refresh_btn = ctk.CTkButton(btn_frame, text="Refresh", width=90, command=self._load_action_log)
+        refresh_btn.pack(side="left")
+
+        clear_btn = ctk.CTkButton(btn_frame, text="Clear", width=90, fg_color=self.alert_red, hover_color="#c23b24", command=self._clear_action_log)
+        clear_btn.pack(side="left", padx=8)
+
+        close_btn = ctk.CTkButton(btn_frame, text="Close", width=90, command=self._action_log_window.destroy)
+        close_btn.pack(side="right")
+
+        self._load_action_log()
+
+    def _load_action_log(self):
+        if not self._action_log_text:
+            return
+        entries = MavrickActions.get_action_log(limit=200)
+        lines = []
+        for entry in entries:
+            timestamp = entry.get("timestamp", "")
+            status = entry.get("status", "")
+            action = entry.get("action", "")
+            detail = entry.get("detail", "")
+            lines.append(f"{timestamp} | {status} | {action} | {detail}")
+        if not lines:
+            lines.append("No actions logged yet.")
+
+        self._action_log_text.configure(state="normal")
+        self._action_log_text.delete("1.0", "end")
+        self._action_log_text.insert("end", "\n".join(lines))
+        self._action_log_text.configure(state="disabled")
+
+    def _clear_action_log(self):
+        if not messagebox.askyesno("Clear Log", "Clear the action log?"):
+            return
+        MavrickActions.clear_action_log()
+        self._load_action_log()
+
+    def open_reminders(self):
+        if self._reminders_window and self._reminders_window.winfo_exists():
+            self._reminders_window.focus()
+            return
+
+        self._reminders_window = ctk.CTkToplevel(self)
+        self._reminders_window.title("Reminders")
+        self._reminders_window.geometry("600x380")
+        self._reminders_window.resizable(False, False)
+        try:
+            self._reminders_window.iconbitmap(self._icon_path)
+        except Exception:
+            pass
+
+        title = ctk.CTkLabel(self._reminders_window, text="REMINDERS", font=("Orbitron", 16, "bold"), text_color=self.primary_cyan)
+        title.pack(pady=(10, 6))
+
+        self._reminders_text = ctk.CTkTextbox(self._reminders_window, height=220)
+        self._reminders_text.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+
+        id_frame = ctk.CTkFrame(self._reminders_window, fg_color="transparent")
+        id_frame.pack(fill="x", padx=12, pady=(0, 6))
+
+        id_label = ctk.CTkLabel(id_frame, text="Reminder ID", font=("Consolas", 10), text_color=self.secondary_teal)
+        id_label.pack(side="left")
+
+        self._reminder_id_entry = ctk.CTkEntry(id_frame, width=160)
+        self._reminder_id_entry.pack(side="left", padx=8)
+
+        cancel_btn = ctk.CTkButton(id_frame, text="Cancel", width=90, command=self._cancel_reminder)
+        cancel_btn.pack(side="left")
+
+        btn_frame = ctk.CTkFrame(self._reminders_window, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=12, pady=(0, 10))
+
+        refresh_btn = ctk.CTkButton(btn_frame, text="Refresh", width=90, command=self._load_reminders)
+        refresh_btn.pack(side="left")
+
+        clear_btn = ctk.CTkButton(btn_frame, text="Clear All", width=90, fg_color=self.alert_red, hover_color="#c23b24", command=self._clear_reminders)
+        clear_btn.pack(side="left", padx=8)
+
+        close_btn = ctk.CTkButton(btn_frame, text="Close", width=90, command=self._reminders_window.destroy)
+        close_btn.pack(side="right")
+
+        self._load_reminders()
+
+    def _load_reminders(self):
+        if not self._reminders_text:
+            return
+        reminders = MavrickActions.get_reminders()
+        lines = []
+        for reminder in reminders:
+            reminder_id = reminder.get("id", "")
+            due_at = reminder.get("due_at", "")
+            message = reminder.get("message", "")
+            lines.append(f"{reminder_id} | {due_at} | {message}")
+        if not lines:
+            lines.append("No reminders scheduled.")
+
+        self._reminders_text.configure(state="normal")
+        self._reminders_text.delete("1.0", "end")
+        self._reminders_text.insert("end", "\n".join(lines))
+        self._reminders_text.configure(state="disabled")
+
+    def _cancel_reminder(self):
+        if not self._reminder_id_entry:
+            return
+        reminder_id = self._reminder_id_entry.get().strip()
+        if not reminder_id:
+            messagebox.showwarning("Reminders", "Enter a reminder id to cancel.")
+            return
+        MavrickActions.cancel_reminder(reminder_id)
+        self._reminder_id_entry.delete(0, "end")
+        self._load_reminders()
+
+    def _clear_reminders(self):
+        if not messagebox.askyesno("Clear Reminders", "Clear all reminders?"):
+            return
+        MavrickActions.clear_reminders()
+        self._load_reminders()
         
     def log_message(self, message):
         self.log_box.insert("end", f"{message}\n")

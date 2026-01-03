@@ -10,7 +10,7 @@ import time
 load_dotenv(override=True)
 
 class VoiceEngine:
-    def __init__(self):
+    def __init__(self, user_name=None, voice=None, persona=None, wake_words=None):
         self.stop_listening = None
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key or "your_actual_key_here" in api_key:
@@ -19,11 +19,13 @@ class VoiceEngine:
             print("OpenAI API Key detected.")
             
         self.client = OpenAI(api_key=api_key)
-        self.user_name = os.getenv("USER_NAME", "Sir")
-        self.voice = "onyx"  # Options: alloy, echo, fable, onyx, nova, shimmer
+        self.user_name = user_name or os.getenv("USER_NAME", "Sir")
+        self.persona = (persona or "mavrick").lower()
+        self.voice = voice or self._voice_for_persona(self.persona)
         self.total_chars = 0
         self.total_cost = 0.0
         self.debug_mode = os.getenv("DEBUG_MODE", "False") == "True"
+        self.wake_words = self._normalize_wake_words(wake_words)
 
         self.recognizer = sr.Recognizer()
         self.recognizer.energy_threshold = 400
@@ -50,14 +52,25 @@ class VoiceEngine:
         if self.debug_mode:
             print(f" [DEBUG] [VOICE]: {msg}")
 
-    def set_persona(self, persona):
-        # Map personas to specific OpenAI voices
+    def _voice_for_persona(self, persona):
         voices = {
             "mavrick": "onyx",
             "jarvis": "fable",
             "friday": "shimmer"
         }
-        self.voice = voices.get(persona.lower(), "onyx")
+        return voices.get(persona.lower(), "onyx")
+
+    def _normalize_wake_words(self, wake_words):
+        default_words = ["computer", "hey computer", "mavrick", "maverick"]
+        if not isinstance(wake_words, list):
+            return default_words
+        cleaned = [str(word).strip().lower() for word in wake_words if str(word).strip()]
+        return cleaned if cleaned else default_words
+
+    def set_persona(self, persona):
+        # Map personas to specific OpenAI voices
+        self.persona = persona.lower()
+        self.voice = self._voice_for_persona(self.persona)
         self.log_debug(f"Voice persona shifted to: {persona} (OpenAI: {self.voice})")
         return f"Personality matrix updated to {persona.upper()}."
 
@@ -169,8 +182,7 @@ class VoiceEngine:
                         text = bg_recognizer.recognize_google(audio, language='en-in').lower()
                         self.log_debug(f"Heard (Low Confidence): '{text}'")
                         
-                        wake_words = ["computer", "hey computer", "mavrick", "maverick"]
-                        if any(word in text for word in wake_words):
+                        if any(word in text for word in self.wake_words):
                             self.log_debug(f"MATCH DETECTED: '{text}'. Triggering wake protocol.")
                             self.bg_callback()
                             time.sleep(2.0)

@@ -1,0 +1,17 @@
+{
+  "work mode": [
+    "start chrome https://github.com",
+    "code",
+    "calc"
+  ],
+  "entertainment": [
+    "start chrome https://youtube.com",
+    "calc"
+  ],
+  "security": [
+    "calc"
+  ],
+  "focus": [
+    "calc"
+  ]
+}

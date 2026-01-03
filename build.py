@@ -27,6 +27,7 @@ ctk_path = os.path.dirname(customtkinter.__file__)
 # Define assets
 assets_source = "assets"
 assets_dest = "assets"
+data_source = "data"
 
 print("--- Mavrick AI Build Process Initiated ---")
 print(f"CustomTkinter Location: {ctk_path}")
@@ -34,6 +35,8 @@ print(f"CustomTkinter Location: {ctk_path}")
 # Verify assets exist
 if not os.path.exists(assets_source):
     print("WARNING: 'assets' folder not found. Audio features may fail.")
+if not os.path.exists(data_source):
+    print("WARNING: 'data' folder not found. Protocols will use defaults.")
 
 try:
     import pygame
@@ -52,11 +55,14 @@ args = [
     '--clean',                                      # Clean cache
     f'--add-data={ctk_path};customtkinter/',        # Bundle CustomTkinter theme data
     f'--add-data={assets_source};assets/',          # Bundle Audio Assets
+    f'--add-data={data_source};data/',              # Bundle Protocol Data
     '--hidden-import=engine',                       # Explicitly import engine package
     '--hidden-import=engine.voice',
     '--hidden-import=engine.brain',
     '--hidden-import=engine.actions',
     '--hidden-import=engine.weather',
+    '--hidden-import=engine.profile',
+    '--hidden-import=engine.scheduler',
     '--hidden-import=PIL._tkinter_finder',          # Fix for CTkImage
     '--hidden-import=babel.numbers',                # Common issue with some libs
     '--hidden-import=dotenv',                       # Explicitly import dotenv module

@@ -10,7 +10,10 @@ from dotenv import load_dotenv
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from engine.brain import MavrickBrain
+from engine.actions import MavrickActions
+from engine.scheduler import ReminderScheduler
 from engine.voice import VoiceEngine
+from engine.profile import load_profile, save_profile
 from gui.app import MavrickUI
 
 class MavrickAssistant:
@@ -27,9 +30,24 @@ class MavrickAssistant:
             sys.exit(0)
 
         load_dotenv(override=True)
-        self.brain = MavrickBrain()
-        self.voice = VoiceEngine()
+        self.profile = load_profile()
+        profile_user_name = self.profile.get("user_name", os.getenv("USER_NAME", "Sir"))
+        profile_persona = self.profile.get("persona", "mavrick")
+        profile_voice = self.profile.get("voice")
+        profile_wake_words = self.profile.get("wake_words")
+        profile_summary = self.profile.get("summary", "")
+
+        self.brain = MavrickBrain(user_name=profile_user_name, summary=profile_summary)
+        self.voice = VoiceEngine(
+            user_name=profile_user_name,
+            voice=profile_voice,
+            persona=profile_persona,
+            wake_words=profile_wake_words
+        )
         self.ui = MavrickUI()
+        self.scheduler = ReminderScheduler(on_trigger=self._handle_reminder)
+        MavrickActions.set_scheduler(self.scheduler)
+        self.scheduler.start()
         
         # Override UI commands
         self.ui.btn_listen.configure(command=self.start_voice_thread)
@@ -47,6 +65,32 @@ class MavrickAssistant:
     def log_debug(self, msg):
         if self.debug_mode:
             print(f" [DEBUG] [MAIN]: {msg}")
+
+    def _persist_profile(self):
+        self.profile = save_profile(self.profile)
+
+    def _update_profile_summary(self):
+        summary = self.brain.get_summary()
+        if summary:
+            self.profile["summary"] = summary
+            self._persist_profile()
+
+    def _handle_reminder(self, reminder):
+        message = reminder.get("message", "Reminder")
+        due_at = reminder.get("due_at", "")
+
+        def _update_ui():
+            self.ui.log_message(f"> REMINDER ({due_at}): {message}")
+
+        try:
+            self.ui.after(0, _update_ui)
+        except Exception:
+            pass
+
+        try:
+            self.voice.speak(f"Reminder: {message}")
+        except Exception:
+            pass
 
     def on_wake_word(self):
         self.log_debug(f"on_wake_word triggered. Current State - is_running: {self.is_running}")
@@ -118,6 +162,9 @@ class MavrickAssistant:
                     new_persona = response.replace("SWITCHING_PERSONA_TO_", "").strip().lower()
                     self.log_debug(f"Persona shift requested: {new_persona}")
                     self.voice.set_persona(new_persona)
+                    self.profile["persona"] = new_persona
+                    self.profile["voice"] = self.voice.voice
+                    self._persist_profile()
                     # Clean up response text for user
                     response = f"Personality matrix successfully shifted to {new_persona.upper()}."
                     self.ui.log_message(f"> SYSTEM: Persona switched to {new_persona.upper()}")
@@ -131,6 +178,7 @@ class MavrickAssistant:
                 
                 # Update HUD Stats
                 self.ui.update_stats(self.brain.session_cost, self.brain.total_tokens, self.brain.current_balance)
+                self._update_profile_summary()
             else:
                 self.log_debug("No audible input or confidence too low.")
                 self.ui.status_label.configure(text="NETWORK STATUS: STANDBY", text_color=self.ui.primary_cyan)

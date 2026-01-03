@@ -1,0 +1,12 @@
+{
+  "user_name": "Sir",
+  "persona": "mavrick",
+  "voice": "onyx",
+  "wake_words": [
+    "computer",
+    "hey computer",
+    "mavrick",
+    "maverick"
+  ],
+  "summary": ""
+}

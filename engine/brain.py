@@ -7,12 +7,16 @@ from engine.actions import MavrickActions
 load_dotenv(override=True)
 
 class MavrickBrain:
-    def __init__(self):
+    def __init__(self, user_name=None, summary=None):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.user_name = os.getenv("USER_NAME", "Sir")
+        self.user_name = user_name or os.getenv("USER_NAME", "Sir")
+        summary_text = summary.strip() if isinstance(summary, str) else ""
+        self.summary = summary_text
         self.memory = [
-            {"role": "system", "content": f"You are Mavrick, a highly intelligent AI assistant (like JARVIS). You are helpful and witty. You have access to system tools. Use them to help the user with time, date, opening apps, searching the web, system stats, media control, and running complex protocols. You can also switch your persona between Mavrick (default), Jarvis (polite/British), and Friday (efficient/sharp)."}
+            {"role": "system", "content": f"You are Mavrick, a highly intelligent AI assistant (like JARVIS). You are helpful and witty. You have access to system tools. Use them to help the user with time, date, opening apps, searching the web, system stats, media control, reminders, and running complex protocols. Protocols are user-defined; call list_protocols to see available names. You can also switch your persona between Mavrick (default), Jarvis (polite/British), and Friday (efficient/sharp)."}
         ]
+        if summary_text:
+            self.memory.append({"role": "system", "content": f"Memory summary (previous session): {summary_text}"})
         self.total_cost = 0.0
         self.total_tokens = 0
         self.session_cost = 0.0
@@ -80,9 +84,60 @@ class MavrickBrain:
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "protocol_name": {"type": "string", "enum": ["work mode", "entertainment", "security", "focus"]}
+                            "protocol_name": {"type": "string"}
                         },
                         "required": ["protocol_name"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_protocols",
+                    "description": "List available protocol names",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "schedule_reminder",
+                    "description": "Schedule a reminder. 'when' supports 'in 10 minutes', 'HH:MM', or 'YYYY-MM-DD HH:MM'.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "message": {"type": "string"},
+                            "when": {"type": "string"}
+                        },
+                        "required": ["message", "when"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_reminders",
+                    "description": "List upcoming reminders",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "cancel_reminder",
+                    "description": "Cancel a reminder by id",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "reminder_id": {"type": "string"}
+                        },
+                        "required": ["reminder_id"]
                     }
                 }
             },
@@ -158,6 +213,18 @@ class MavrickBrain:
                     elif func_name == "switch_persona":
                         # We return a special string for main.py to handle the external voice change
                         result = f"SWITCHING_PERSONA_TO_{args['persona'].upper()}"
+                    elif func_name == "list_protocols":
+                        protocols = MavrickActions.list_protocols()
+                        if protocols:
+                            result = "Available protocols: " + ", ".join(protocols)
+                        else:
+                            result = "No protocols are available."
+                    elif func_name == "schedule_reminder":
+                        result = MavrickActions.schedule_reminder(args["message"], args["when"])
+                    elif func_name == "list_reminders":
+                        result = MavrickActions.list_reminders()
+                    elif func_name == "cancel_reminder":
+                        result = MavrickActions.cancel_reminder(args["reminder_id"])
                     
                     self.log_debug(f"TOOL RESULT: {result[:50]}...")
                     # Append each tool response
@@ -224,11 +291,30 @@ class MavrickBrain:
                     # Fallback if no user message found in the last 15 (unlikely but safe)
                     self.memory = [system_prompt] + self.memory[-2:]
                     self.log_debug("Fallback context reset performed.")
+
+            self.summary = self._build_summary()
                     
             return assistant_message
             
         except Exception as e:
             return f"I apologize, {self.user_name}, but I encountered an error: {str(e)}"
+
+    def _build_summary(self):
+        def _clean(text):
+            return " ".join(str(text).split())
+
+        recent_users = [_clean(m.get("content", "")) for m in self.memory if m.get("role") == "user"][-3:]
+        recent_assistant = [_clean(m.get("content", "")) for m in self.memory if m.get("role") == "assistant"][-2:]
+        parts = []
+        if recent_users:
+            parts.append("Recent user requests: " + " | ".join(recent_users))
+        if recent_assistant:
+            parts.append("Recent assistant replies: " + " | ".join(recent_assistant))
+        summary = " / ".join(parts).strip()
+        return summary[:800]
+
+    def get_summary(self):
+        return self.summary
 
 if __name__ == "__main__":
     brain = MavrickBrain()
