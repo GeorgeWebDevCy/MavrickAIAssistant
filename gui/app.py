@@ -900,7 +900,7 @@ class MavrickUI(ctk.CTk):
         title_label = ctk.CTkLabel(
             frame,
             text=title,
-            font=("Orbitron", 12, "bold"),
+            font=("Orbitron", 14, "bold"),
             text_color=self.primary_cyan
         )
         title_label.pack(anchor="w", padx=10, pady=(8, 4))
@@ -908,10 +908,10 @@ class MavrickUI(ctk.CTk):
         body = ctk.CTkLabel(
             frame,
             text="\n".join(lines),
-            font=("Consolas", 10),
+            font=("Consolas", 12),
             text_color=self.secondary_teal,
             justify="left",
-            wraplength=520
+            wraplength=620
         )
         body.pack(anchor="w", padx=10, pady=(0, 8))
         return frame
@@ -929,7 +929,7 @@ class MavrickUI(ctk.CTk):
         title = ctk.CTkLabel(
             frame,
             text="SYSTEM MODULES",
-            font=("Orbitron", 12, "bold"),
+            font=("Orbitron", 14, "bold"),
             text_color=self.primary_cyan
         )
         title.pack(anchor="w", padx=10, pady=(8, 4))
@@ -944,7 +944,7 @@ class MavrickUI(ctk.CTk):
             chip = ctk.CTkLabel(
                 grid,
                 text=label,
-                font=("Consolas", 9),
+                font=("Consolas", 11),
                 text_color=self.primary_cyan,
                 fg_color="#08242b",
                 corner_radius=10
@@ -967,7 +967,7 @@ class MavrickUI(ctk.CTk):
         title = ctk.CTkLabel(
             frame,
             text="SHORTCUTS",
-            font=("Orbitron", 12, "bold"),
+            font=("Orbitron", 14, "bold"),
             text_color=self.primary_cyan
         )
         title.pack(anchor="w", padx=10, pady=(8, 4))
@@ -977,8 +977,8 @@ class MavrickUI(ctk.CTk):
         table.grid_columnconfigure(0, weight=0)
         table.grid_columnconfigure(1, weight=1)
 
-        key_header = ctk.CTkLabel(table, text="KEY", font=("Consolas", 10, "bold"), text_color=self.primary_cyan)
-        action_header = ctk.CTkLabel(table, text="ACTION", font=("Consolas", 10, "bold"), text_color=self.primary_cyan)
+        key_header = ctk.CTkLabel(table, text="KEY", font=("Consolas", 11, "bold"), text_color=self.primary_cyan)
+        action_header = ctk.CTkLabel(table, text="ACTION", font=("Consolas", 11, "bold"), text_color=self.primary_cyan)
         key_header.grid(row=0, column=0, sticky="w", padx=(0, 12), pady=(0, 6))
         action_header.grid(row=0, column=1, sticky="w", pady=(0, 6))
 
@@ -986,16 +986,16 @@ class MavrickUI(ctk.CTk):
             key_label = ctk.CTkLabel(
                 table,
                 text=keys,
-                font=("Consolas", 10, "bold"),
+                font=("Consolas", 11, "bold"),
                 text_color=self.primary_cyan
             )
             desc_label = ctk.CTkLabel(
                 table,
                 text=description,
-                font=("Consolas", 10),
+                font=("Consolas", 11),
                 text_color=self.secondary_teal,
                 justify="left",
-                wraplength=360
+                wraplength=460
             )
             key_label.grid(row=row, column=0, sticky="w", padx=(0, 12), pady=2)
             desc_label.grid(row=row, column=1, sticky="w", pady=2)
@@ -1008,7 +1008,7 @@ class MavrickUI(ctk.CTk):
 
         self._help_window = ctk.CTkToplevel(self)
         self._help_window.title("Help")
-        self._help_window.geometry("660x640")
+        self._help_window.geometry("760x680")
         self._help_window.resizable(False, False)
         self._help_window.configure(fg_color=self.bg_black)
         try:
@@ -1028,7 +1028,7 @@ class MavrickUI(ctk.CTk):
         title = ctk.CTkLabel(
             header,
             text="MAVRICK // SYSTEM DOSSIER",
-            font=("Orbitron", 16, "bold"),
+            font=("Orbitron", 18, "bold"),
             text_color=self.primary_cyan
         )
         title.pack(anchor="w", padx=12, pady=(10, 2))
@@ -1036,7 +1036,7 @@ class MavrickUI(ctk.CTk):
         subtitle = ctk.CTkLabel(
             header,
             text="Capabilities, controls, and shortcuts",
-            font=("Consolas", 10),
+            font=("Consolas", 12),
             text_color=self.secondary_teal
         )
         subtitle.pack(anchor="w", padx=12, pady=(0, 8))
@@ -1047,7 +1047,7 @@ class MavrickUI(ctk.CTk):
         status_chip = ctk.CTkLabel(
             status_frame,
             text="STATUS: ONLINE",
-            font=("Consolas", 10, "bold"),
+            font=("Consolas", 12, "bold"),
             text_color=self.primary_cyan,
             fg_color=self.dim_cyan,
             corner_radius=8
@@ -1057,7 +1057,7 @@ class MavrickUI(ctk.CTk):
         hint_chip = ctk.CTkLabel(
             status_frame,
             text="PRESS F1 FOR HELP",
-            font=("Consolas", 10),
+            font=("Consolas", 12),
             text_color=self.secondary_teal,
             fg_color="#0c1d23",
             corner_radius=8
