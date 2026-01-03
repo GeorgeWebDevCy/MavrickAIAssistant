@@ -68,6 +68,7 @@ args = [
     '--hidden-import=engine.profile',
     '--hidden-import=engine.scheduler',
     '--hidden-import=engine.skills',
+    '--hidden-import=engine.notes',
     '--hidden-import=engine.command_history',
     '--hidden-import=engine.session_log',
     '--hidden-import=pystray',

@@ -7,6 +7,7 @@ import webbrowser
 import psutil
 import platform
 from engine import vision
+from engine import notes
 
 _DEFAULT_PROTOCOLS = {
     "work mode": ["start chrome https://github.com", "code", "calc"],
@@ -333,6 +334,32 @@ class MavrickActions:
             status = "failed"
         _audit_action("screen_ocr", detail, status)
         return result
+
+    @staticmethod
+    def add_note(text):
+        return notes.add_note(text)
+
+    @staticmethod
+    def list_notes():
+        items = notes.list_notes(limit=20)
+        if not items:
+            return "No notes yet."
+        lines = []
+        for item in items:
+            lines.append(f"{item.get('id')} | {item.get('created_at')} | {item.get('text')}")
+        return "Notes:\n" + "\n".join(lines)
+
+    @staticmethod
+    def get_notes():
+        return notes.list_notes(limit=200)
+
+    @staticmethod
+    def delete_note(note_id):
+        return notes.delete_note(note_id)
+
+    @staticmethod
+    def clear_notes():
+        return notes.clear_notes()
 
     @staticmethod
     def get_system_stats():

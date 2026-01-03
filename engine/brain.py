@@ -14,7 +14,7 @@ class MavrickBrain:
         summary_text = summary.strip() if isinstance(summary, str) else ""
         self.summary = summary_text
         self.memory = [
-            {"role": "system", "content": f"You are Mavrick, a highly intelligent AI assistant (like JARVIS). You are helpful and witty. You have access to system tools. Use them to help the user with time, date, opening apps, searching the web, system stats, media control, reminders, custom skills, and running complex protocols. Protocols are user-defined; call list_protocols to see available names. Custom skills may be available; call list_skills to see what's loaded. You can also switch your persona between Mavrick (default), Jarvis (polite/British), and Friday (efficient/sharp)."}
+            {"role": "system", "content": f"You are Mavrick, a highly intelligent AI assistant (like JARVIS). You are helpful and witty. You have access to system tools. Use them to help the user with time, date, opening apps, searching the web, system stats, media control, notes, reminders, custom skills, and running complex protocols. Protocols are user-defined; call list_protocols to see available names. Custom skills may be available; call list_skills to see what's loaded. You can also switch your persona between Mavrick (default), Jarvis (polite/British), and Friday (efficient/sharp)."}
         ]
         if summary_text:
             self.memory.append({"role": "system", "content": f"Memory summary (previous session): {summary_text}"})
@@ -195,6 +195,45 @@ class MavrickBrain:
             {
                 "type": "function",
                 "function": {
+                    "name": "add_note",
+                    "description": "Save a quick note.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "text": {"type": "string"}
+                        },
+                        "required": ["text"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_notes",
+                    "description": "List recent notes.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "delete_note",
+                    "description": "Delete a note by id.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "note_id": {"type": "string"}
+                        },
+                        "required": ["note_id"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "switch_persona",
                     "description": "Change the assistant's persona, voice, and speaking style",
                     "parameters": {
@@ -273,6 +312,12 @@ class MavrickBrain:
                         result = MavrickActions.cancel_reminder(args["reminder_id"])
                     elif func_name == "screen_ocr":
                         result = MavrickActions.screen_ocr(args.get("region"), args.get("save", False))
+                    elif func_name == "add_note":
+                        result = MavrickActions.add_note(args["text"])
+                    elif func_name == "list_notes":
+                        result = MavrickActions.list_notes()
+                    elif func_name == "delete_note":
+                        result = MavrickActions.delete_note(args["note_id"])
                     elif func_name in self.skill_manager.skills:
                         result = self.skill_manager.execute(func_name, args)
                     else:

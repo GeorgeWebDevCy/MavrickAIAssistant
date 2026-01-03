@@ -12,6 +12,7 @@ import pyaudio
 from engine.actions import MavrickActions
 from engine import session_log
 from engine import command_history
+from engine import notes
 from engine.weather import WeatherEngine
 from ctypes import windll, c_int, byref, sizeof
 import ctypes
@@ -74,6 +75,10 @@ class MavrickUI(ctk.CTk):
         self._command_history = []
         self._command_history_index = 0
         self._command_history_loaded = False
+        self._notes_window = None
+        self._notes_text = None
+        self._note_input = None
+        self._note_id_entry = None
         self._protocols_cache = {}
         self._protocol_var = None
         self._protocol_menu = None
@@ -267,6 +272,9 @@ class MavrickUI(ctk.CTk):
 
         self.btn_command_history = ctk.CTkButton(self, text="COMMAND HISTORY", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_command_history)
         self.btn_command_history.pack(pady=5, padx=40, fill="x")
+
+        self.btn_notes = ctk.CTkButton(self, text="NOTES", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_notes)
+        self.btn_notes.pack(pady=5, padx=40, fill="x")
 
         self.btn_reminders = ctk.CTkButton(self, text="REMINDERS", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_reminders)
         self.btn_reminders.pack(pady=5, padx=40, fill="x")
@@ -926,6 +934,120 @@ class MavrickUI(ctk.CTk):
             os.startfile(path)
         except Exception:
             messagebox.showwarning("Command History", f"Could not open history file:\n{path}")
+
+    def open_notes(self):
+        if self._notes_window and self._notes_window.winfo_exists():
+            self._notes_window.focus()
+            return
+
+        self._notes_window = ctk.CTkToplevel(self)
+        self._notes_window.title("Notes")
+        self._notes_window.geometry("640x420")
+        self._notes_window.resizable(False, False)
+        try:
+            self._notes_window.iconbitmap(self._icon_path)
+        except Exception:
+            pass
+
+        title = ctk.CTkLabel(self._notes_window, text="NOTES", font=("Orbitron", 16, "bold"), text_color=self.primary_cyan)
+        title.pack(pady=(10, 6))
+
+        input_label = ctk.CTkLabel(self._notes_window, text="New Note", font=("Consolas", 10), text_color=self.secondary_teal)
+        input_label.pack(anchor="w", padx=12)
+
+        self._note_input = ctk.CTkTextbox(self._notes_window, height=70)
+        self._note_input.pack(fill="x", padx=12, pady=(0, 6))
+
+        add_btn = ctk.CTkButton(self._notes_window, text="Add Note", width=90, command=self._add_note)
+        add_btn.pack(padx=12, pady=(0, 8), anchor="w")
+
+        self._notes_text = ctk.CTkTextbox(self._notes_window, height=200)
+        self._notes_text.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+
+        id_frame = ctk.CTkFrame(self._notes_window, fg_color="transparent")
+        id_frame.pack(fill="x", padx=12, pady=(0, 6))
+
+        id_label = ctk.CTkLabel(id_frame, text="Note ID", font=("Consolas", 10), text_color=self.secondary_teal)
+        id_label.pack(side="left")
+
+        self._note_id_entry = ctk.CTkEntry(id_frame, width=160)
+        self._note_id_entry.pack(side="left", padx=8)
+
+        delete_btn = ctk.CTkButton(id_frame, text="Delete", width=90, command=self._delete_note)
+        delete_btn.pack(side="left")
+
+        btn_frame = ctk.CTkFrame(self._notes_window, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=12, pady=(0, 10))
+
+        refresh_btn = ctk.CTkButton(btn_frame, text="Refresh", width=90, command=self._load_notes)
+        refresh_btn.pack(side="left")
+
+        open_btn = ctk.CTkButton(btn_frame, text="Open File", width=90, command=self._open_notes_file)
+        open_btn.pack(side="left", padx=8)
+
+        clear_btn = ctk.CTkButton(btn_frame, text="Clear", width=90, fg_color=self.alert_red, hover_color="#c23b24", command=self._clear_notes)
+        clear_btn.pack(side="left")
+
+        close_btn = ctk.CTkButton(btn_frame, text="Close", width=90, command=self._notes_window.destroy)
+        close_btn.pack(side="right")
+
+        self._load_notes()
+
+    def _load_notes(self):
+        if not self._notes_text:
+            return
+        items = notes.list_notes(limit=200)
+        lines = []
+        for item in items:
+            note_id = item.get("id", "")
+            created = item.get("created_at", "")
+            text = item.get("text", "")
+            lines.append(f"{note_id} | {created} | {text}")
+        if not lines:
+            lines.append("No notes yet.")
+
+        self._notes_text.configure(state="normal")
+        self._notes_text.delete("1.0", "end")
+        self._notes_text.insert("end", "\n".join(lines))
+        self._notes_text.configure(state="disabled")
+
+    def _add_note(self):
+        if not self._note_input:
+            return
+        text = self._note_input.get("1.0", "end").strip()
+        if not text:
+            messagebox.showwarning("Notes", "Enter a note.")
+            return
+        notes.add_note(text)
+        self._note_input.delete("1.0", "end")
+        self._load_notes()
+
+    def _delete_note(self):
+        if not self._note_id_entry:
+            return
+        note_id = self._note_id_entry.get().strip()
+        if not note_id:
+            messagebox.showwarning("Notes", "Enter a note id to delete.")
+            return
+        notes.delete_note(note_id)
+        self._note_id_entry.delete(0, "end")
+        self._load_notes()
+
+    def _clear_notes(self):
+        if not messagebox.askyesno("Clear Notes", "Clear all notes?"):
+            return
+        notes.clear_notes()
+        self._load_notes()
+
+    def _open_notes_file(self):
+        path = notes.get_notes_path()
+        if not os.path.exists(path):
+            messagebox.showinfo("Notes", "No notes file yet.")
+            return
+        try:
+            os.startfile(path)
+        except Exception:
+            messagebox.showwarning("Notes", f"Could not open notes file:\n{path}")
 
     def set_close_action(self, callback):
         self._close_callback = callback or self.destroy
