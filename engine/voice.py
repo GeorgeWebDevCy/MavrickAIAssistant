@@ -34,6 +34,8 @@ class VoiceEngine:
         self.user_name = user_name or os.getenv("USER_NAME", "Sir")
         self.persona = (persona or "mavrick").lower()
         self.voice = voice or self._voice_for_persona(self.persona)
+        voice_value = str(voice).strip().lower() if voice else ""
+        self.voice_override = bool(voice_value and voice_value != self._voice_for_persona(self.persona))
         self.total_chars = 0
         self.total_cost = 0.0
         self.debug_mode = os.getenv("DEBUG_MODE", "False") == "True"
@@ -42,6 +44,8 @@ class VoiceEngine:
         self.offline_tts = os.getenv("OFFLINE_TTS", "False").lower() == "true"
         self.offline_stt = os.getenv("OFFLINE_STT", "False").lower() == "true"
         self._tts_engine = None
+        self._system_voice_id = None
+        self._system_voice_checked = False
         self._vosk_model = None
         self._vosk_model_path = self._resolve_vosk_path()
         if self._vosk_model_path:
@@ -103,6 +107,71 @@ class VoiceEngine:
         }
         return voices.get(persona.lower(), "onyx")
 
+    def _voice_profile_text(self, voice):
+        parts = []
+        for attr in ("name", "id", "gender"):
+            value = getattr(voice, attr, "")
+            if value:
+                parts.append(str(value))
+        languages = getattr(voice, "languages", []) or []
+        for lang in languages:
+            if isinstance(lang, bytes):
+                try:
+                    parts.append(lang.decode("utf-8", "ignore"))
+                except Exception:
+                    parts.append(str(lang))
+            else:
+                parts.append(str(lang))
+        return " ".join(parts).lower()
+
+    def _select_system_voice(self, persona):
+        if not self._ensure_tts_engine():
+            return None
+        voices = self._tts_engine.getProperty("voices") or []
+        if not voices:
+            return None
+        persona = str(persona or "").lower()
+        if persona not in ("jarvis", "friday"):
+            return None
+
+        british_tokens = [
+            "en-gb", "en_gb", "uk", "british",
+            "united kingdom", "great britain", "english (united kingdom)", "english (great britain)"
+        ]
+        female_tokens = ["female", "woman", "feminine", "hazel", "sonia", "susan", "libby", "catherine", "zira"]
+        male_tokens = ["male", "man", "masculine", "george", "david", "ryan", "mark", "james"]
+        gender_tokens = female_tokens if persona == "friday" else male_tokens
+        opposite_tokens = male_tokens if persona == "friday" else female_tokens
+
+        scored = []
+        for voice in voices:
+            text = self._voice_profile_text(voice)
+            score = 0
+            if any(token in text for token in british_tokens):
+                score += 4
+            if any(token in text for token in gender_tokens):
+                score += 3
+            if any(token in text for token in opposite_tokens):
+                score -= 2
+            scored.append((score, voice))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        best_score, best_voice = scored[0]
+        if best_score <= 0:
+            return None
+        return getattr(best_voice, "id", None)
+
+    def _ensure_system_voice(self):
+        if self._system_voice_checked:
+            return self._system_voice_id
+        self._system_voice_checked = True
+        self._system_voice_id = self._select_system_voice(self.persona)
+        if self._system_voice_id:
+            self.log_debug(f"System voice selected for {self.persona}: {self._system_voice_id}")
+        else:
+            self.log_debug(f"No British system voice found for {self.persona}.")
+        return self._system_voice_id
+
     def _normalize_wake_words(self, wake_words):
         default_words = ["computer", "hey computer", "mavrick", "maverick"]
         if not isinstance(wake_words, list):
@@ -114,6 +183,9 @@ class VoiceEngine:
         # Map personas to specific OpenAI voices
         self.persona = persona.lower()
         self.voice = self._voice_for_persona(self.persona)
+        self.voice_override = False
+        self._system_voice_id = None
+        self._system_voice_checked = False
         self.log_debug(f"Voice persona shifted to: {persona} (OpenAI: {self.voice})")
         return f"Personality matrix updated to {persona.upper()}."
 
@@ -121,8 +193,10 @@ class VoiceEngine:
         voice = str(voice).strip().lower()
         if not voice:
             self.voice = self._voice_for_persona(self.persona)
+            self.voice_override = False
         else:
             self.voice = voice
+            self.voice_override = True
         self.log_debug(f"Voice override set to: {self.voice}")
         return self.voice
 
@@ -158,10 +232,12 @@ class VoiceEngine:
             self._tts_engine = None
             return False
 
-    def _speak_offline(self, text):
+    def _speak_offline(self, text, voice_id=None):
         if not self._ensure_tts_engine():
             return False
         try:
+            if voice_id:
+                self._tts_engine.setProperty("voice", voice_id)
             self._tts_engine.say(text)
             self._tts_engine.runAndWait()
             return True
@@ -176,8 +252,11 @@ class VoiceEngine:
         self.total_chars += len(text)
         # OpenAI TTS costs $0.015 per 1,000 characters
         self.total_cost += (len(text) / 1000) * 0.015
-        if self.offline_tts:
-            if self._speak_offline(text):
+        system_voice_id = None
+        if self.persona in ("jarvis", "friday"):
+            system_voice_id = self._ensure_system_voice()
+        if self.offline_tts or (system_voice_id and not self.voice_override):
+            if self._speak_offline(text, voice_id=system_voice_id):
                 return
         try:
             # Generate speech using OpenAI TTS
