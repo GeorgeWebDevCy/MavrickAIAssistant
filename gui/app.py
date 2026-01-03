@@ -1,18 +1,33 @@
 import customtkinter as ctk
 import math
+import os
+import sys
 import threading
 import time
 import psutil
+import numpy as np
+import pyaudio
+from engine.weather import WeatherEngine
+from ctypes import windll, c_int, byref, sizeof
+import ctypes
+
+def _asset_path(*parts):
+    # Resolve assets for both source and PyInstaller builds.
+    base_dir = getattr(sys, "_MEIPASS", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    return os.path.join(base_dir, *parts)
 
 class MavrickUI(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("MAVRICK HUD")
-        self.geometry("450x700")
-        self.attributes("-alpha", 0.95)  # Slightly more opaque for premium feel
-        self.attributes("-topmost", True)
-        self.overrideredirect(True)      # Borderless HUD
+        
+        # Set AppUserModelID for Taskbar Icon grouping
+        try:
+            myappid = 'mavrick.ai.assistant.hud.1.0' # arbitrary string
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+        except:
+            pass
         
         # Colors
         self.primary_cyan = "#00d2ff"
@@ -21,6 +36,34 @@ class MavrickUI(ctk.CTk):
         self.alert_orange = "#ff9f1c"
         self.bg_black = "#050505"
         self.alert_red = "#ff4b2b"
+
+        self.geometry("450x700")
+        self.attributes("-alpha", 0.95)  # Slightly more opaque for premium feel
+        self.attributes("-topmost", True)
+        self.overrideredirect(True)      # Borderless HUD
+
+        self._icon_path = _asset_path("assets", "icon.ico")
+        self._taskbar_icon = None
+        self._apply_window_icon()
+        
+        # Taskbar Icon Fix for Overrideredirect
+        # GWL_EXSTYLE = -20
+        # WS_EX_APPWINDOW = 0x00040000
+        # WS_EX_TOOLWINDOW = 0x00000080
+        try:
+            self.after(10, self._set_window_style)
+        except Exception as e:
+            print(f"Taskbar fix error: {e}")
+
+        # Close Button (Top Right)
+        self.btn_close = ctk.CTkButton(self, text="✕", width=30, height=30,
+                                       fg_color="transparent", hover_color="#ff4b2b",
+                                       text_color=self.primary_cyan,
+                                       font=("Arial", 14),
+                                       command=self.destroy)
+        self.btn_close.place(relx=0.92, rely=0.01)
+        
+
         
         # Center the window
         screen_width = self.winfo_screenwidth()
@@ -52,8 +95,24 @@ class MavrickUI(ctk.CTk):
         self.cpu_usage = 0
         self.ram_usage = 0
         
+        # Audio Stream for Visualizer
+        self.p = pyaudio.PyAudio()
+        self.stream = None
+        self.audio_running = False
+        try:
+            self.stream = self.p.open(format=pyaudio.paInt16,
+                                      channels=1,
+                                      rate=44100,
+                                      input=True,
+                                      frames_per_buffer=1024)
+            self.audio_running = True
+        except Exception as e:
+            print(f"Audio Input Error: {e}")
+            self.audio_running = False
+
         self.setup_ui()
         self.start_monitor_thread()
+        self.start_weather_thread()
         self.animate_hud()
 
     def setup_ui(self):
@@ -112,7 +171,8 @@ class MavrickUI(ctk.CTk):
             ("ENC: RSA-4096", 40, 120),
             ("BIT: 128-FLOAT", 40, 280),
             ("CPU: MONITOR", 340, 120),
-            ("RAM: MONITOR", 340, 280)
+            ("RAM: MONITOR", 340, 280),
+            ("WTH: SCANNING...", 340, 200) # Weather Label
         ]
         for text, x, y in data_configs:
             lbl = ctk.CTkLabel(self, text=text, font=("Consolas", 9), text_color=self.secondary_teal)
@@ -165,6 +225,18 @@ class MavrickUI(ctk.CTk):
                 self.ram_usage = psutil.virtual_memory().percent
                 time.sleep(1)
         threading.Thread(target=monitor, daemon=True).start()
+
+    def start_weather_thread(self):
+        def update_weather():
+            while True:
+                w_data = WeatherEngine.get_weather()
+                # Update UI from main thread ideally, but Tkinter usually handles text config in threads okay-ish, 
+                # strictly we should use after(), but let's try direct update first or use a variable.
+                # Safe way:
+                if len(self.data_labels) > 4:
+                     self.data_labels[4].configure(text=f"WTH: {w_data}")
+                time.sleep(600) # Update every 10 mins
+        threading.Thread(target=update_weather, daemon=True).start()
 
     def update_parallax_target(self, event):
         # Calculate center of the canvas relative to the window
@@ -307,8 +379,55 @@ class MavrickUI(ctk.CTk):
         if len(self.data_labels) > 3: # Ensure labels exist
             self.data_labels[2].configure(text=f"CPU: {self.cpu_usage:.0f}%")
             self.data_labels[3].configure(text=f"RAM: {self.ram_usage:.0f}%")
-        
+
+        self.update_visualizer()
         self.after(30, self.animate_hud)
+
+    def update_visualizer(self):
+        if self.audio_running and self.stream:
+            try:
+                data = np.frombuffer(self.stream.read(1024, exception_on_overflow=False), dtype=np.int16)
+                # Compute FFT
+                fft_data = np.fft.rfft(data)
+                fft_mag = np.abs(fft_data)
+                
+                # Normalize and bin into 16 bars
+                # We have 513 bins (1024/2 + 1). We need 16.
+                step = len(fft_mag) // 16
+                
+                for i, bar in enumerate(self.bars):
+                    # Average magnitude for this bin
+                    mag = np.mean(fft_mag[i*step : (i+1)*step])
+                    
+                    # Scale factor - adjust experimental
+                    h = min(50, int(mag / 100)) # improved scaling
+                    
+                    # Apply to bar
+                    x_base = 70 + (i * 10)
+                    y_base = 280 
+                    bar_shift_x = self.p_x * 0.4
+                    bar_shift_y = self.p_y * 0.4
+                    
+                    self.canvas.coords(bar, 
+                                       x_base + bar_shift_x, 
+                                       y_base - h + bar_shift_y, 
+                                       x_base + 6 + bar_shift_x, 
+                                       y_base + bar_shift_y)
+            except Exception:
+                pass
+        else:
+            # Fallback to simulation if no audio
+            bar_shift_x = self.p_x * 0.4
+            bar_shift_y = self.p_y * 0.4
+            for i, bar in enumerate(self.bars):
+                h = 5 + abs(math.sin(self.pulse_val + i*0.4) * 25)
+                x_base = 70 + (i * 10)
+                y_base = 280 
+                self.canvas.coords(bar, 
+                                   x_base + bar_shift_x, 
+                                   y_base - h + bar_shift_y, 
+                                   x_base + 6 + bar_shift_x, 
+                                   y_base + bar_shift_y)
 
     def on_engage(self):
         self.log_message("ACCESSING SPEECH CHANNEL...")
@@ -324,6 +443,70 @@ class MavrickUI(ctk.CTk):
         x = self.winfo_x() + deltax
         y = self.winfo_y() + deltay
         self.geometry(f"+{x}+{y}")
+
+    def _apply_window_icon(self):
+        try:
+            if os.path.exists(self._icon_path):
+                self.iconbitmap(self._icon_path)
+        except Exception:
+            pass
+
+        try:
+            hwnd = windll.user32.GetParent(self.winfo_id())
+            if not hwnd:
+                hwnd = self.winfo_id()
+            if not hwnd:
+                return
+
+            if os.path.exists(self._icon_path):
+                IMAGE_ICON = 1
+                LR_LOADFROMFILE = 0x00000010
+                LR_DEFAULTSIZE = 0x00000040
+                WM_SETICON = 0x0080
+                ICON_SMALL = 0
+                ICON_BIG = 1
+
+                hicon = windll.user32.LoadImageW(
+                    None,
+                    self._icon_path,
+                    IMAGE_ICON,
+                    0,
+                    0,
+                    LR_LOADFROMFILE | LR_DEFAULTSIZE,
+                )
+                if hicon:
+                    self._taskbar_icon = hicon
+                    windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_SMALL, hicon)
+                    windll.user32.SendMessageW(hwnd, WM_SETICON, ICON_BIG, hicon)
+        except Exception:
+            pass
+
+    def _set_window_style(self):
+        try:
+            hwnd = windll.user32.GetParent(self.winfo_id())
+            # If GetParent returns 0, it might be the root itself or we need to wait
+            if not hwnd:
+                 hwnd = self.winfo_id()
+                 
+            # Force the window to be an app window
+            GWL_EXSTYLE = -20
+            WS_EX_APPWINDOW = 0x00040000
+            WS_EX_TOOLWINDOW = 0x00000080
+            
+            style = windll.user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+            style = style & ~WS_EX_TOOLWINDOW
+            style = style | WS_EX_APPWINDOW
+            windll.user32.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+            
+            # Re-assert proper attributes
+            self.wm_withdraw()
+            self.wm_deiconify()
+            self.attributes("-topmost", True)
+            
+            # Re-apply icon to ensure taskbar picks it up
+            self._apply_window_icon()
+        except Exception as e:
+            print(f"Could not apply window style: {e}") 
 
 if __name__ == "__main__":
     app = MavrickUI()

@@ -1,6 +1,24 @@
+import os
+import sys
+
+def _maybe_add_local_venv_site_packages():
+    if sys.prefix != sys.base_prefix:
+        return None
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    for folder in ("venv", ".venv"):
+        candidate = os.path.join(project_root, folder, "Lib", "site-packages")
+        if os.path.isdir(candidate):
+            if candidate not in sys.path:
+                sys.path.insert(0, candidate)
+            return candidate
+    return None
+
+venv_site_packages = _maybe_add_local_venv_site_packages()
+if venv_site_packages:
+    print(f"Using local venv site-packages for build: {venv_site_packages}")
+
 import PyInstaller.__main__
 import customtkinter
-import os
 import shutil
 
 # Get customtkinter path for data inclusion
@@ -17,10 +35,18 @@ print(f"CustomTkinter Location: {ctk_path}")
 if not os.path.exists(assets_source):
     print("WARNING: 'assets' folder not found. Audio features may fail.")
 
+try:
+    import pygame
+except Exception as exc:
+    print("ERROR: pygame is required for audio but could not be imported.")
+    print("Install pygame in the build environment or run this script from the project venv.")
+    raise SystemExit(1) from exc
+
 # PyInstaller arguments
 args = [
     'main.py',                                      # Main script
     '--name=Mavrick',                               # Executable name
+    '--icon=assets/icon.ico',                       # Application Icon
     '--noconsole',                                  # Windowed mode (no terminal)
     '--onefile',                                    # Single executable file
     '--clean',                                      # Clean cache
@@ -30,14 +56,19 @@ args = [
     '--hidden-import=engine.voice',
     '--hidden-import=engine.brain',
     '--hidden-import=engine.actions',
+    '--hidden-import=engine.weather',
     '--hidden-import=PIL._tkinter_finder',          # Fix for CTkImage
     '--hidden-import=babel.numbers',                # Common issue with some libs
     '--hidden-import=dotenv',                       # Explicitly import dotenv module
     '--collect-all=psutil',                         # Collect all psutil data
     '--collect-all=speech_recognition',             # Collect all SR data
     '--collect-all=pygame',                         # Collect all pygame data
+    '--collect-all=requests',                       # Collect requests data
     '--collect-all=dotenv'                          # Collect pkg data
 ]
+
+if venv_site_packages:
+    args.append(f'--paths={venv_site_packages}')
 
 # Manually find and bundle dotenv
 try:
