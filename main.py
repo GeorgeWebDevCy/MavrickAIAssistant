@@ -153,12 +153,22 @@ class MavrickAssistant:
             pass
 
     def minimize_to_tray(self):
-        try:
-            self.ui.hide_to_tray()
-        except Exception:
-            pass
+        tray_started = False
         if self.tray:
-            self.tray.start()
+            try:
+                tray_started = self.tray.start()
+            except Exception:
+                tray_started = False
+        if tray_started:
+            try:
+                self.ui.hide_to_tray()
+            except Exception:
+                pass
+        else:
+            try:
+                messagebox.showwarning("Mavrick HUD", "System tray icon is unavailable. The HUD will remain open.")
+            except Exception:
+                pass
 
     def toggle_mute(self):
         self.is_muted = self.voice.toggle_mute()

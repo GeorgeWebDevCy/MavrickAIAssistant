@@ -20,6 +20,7 @@ class TrayController:
         self.on_exit = on_exit
         self.icon = None
         self.thread = None
+        self._ready = threading.Event()
         self.is_muted = False
         self.available = pystray is not None and Image is not None
 
@@ -27,10 +28,13 @@ class TrayController:
         if not self.available:
             return False
         if self.thread and self.thread.is_alive():
-            return True
+            return self.icon is not None
+        self.icon = None
+        self._ready.clear()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
-        return True
+        self._ready.wait(timeout=0.5)
+        return self.icon is not None
 
     def stop(self):
         if self.icon:
@@ -38,6 +42,7 @@ class TrayController:
                 self.icon.stop()
             except Exception:
                 pass
+            self.icon = None
 
     def set_muted(self, muted):
         self.is_muted = bool(muted)
@@ -48,15 +53,20 @@ class TrayController:
                 pass
 
     def _run(self):
-        image = self._load_icon_image()
-        menu = pystray.Menu(
-            pystray.MenuItem("Open HUD", self._handle_open),
-            pystray.MenuItem("Listen", self._handle_listen),
-            pystray.MenuItem("Mute", self._handle_toggle_mute, checked=self._is_muted),
-            pystray.MenuItem("Exit", self._handle_exit)
-        )
-        self.icon = pystray.Icon("Mavrick", image, "Mavrick", menu)
-        self.icon.run()
+        try:
+            image = self._load_icon_image()
+            menu = pystray.Menu(
+                pystray.MenuItem("Open HUD", self._handle_open),
+                pystray.MenuItem("Listen", self._handle_listen),
+                pystray.MenuItem("Mute", self._handle_toggle_mute, checked=self._is_muted),
+                pystray.MenuItem("Exit", self._handle_exit)
+            )
+            self.icon = pystray.Icon("Mavrick", image, "Mavrick", menu)
+            self._ready.set()
+            self.icon.run()
+        except Exception:
+            self.icon = None
+            self._ready.set()
 
     def _load_icon_image(self):
         if Image is None:
