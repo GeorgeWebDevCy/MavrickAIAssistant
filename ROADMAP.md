@@ -74,6 +74,7 @@ Each feature includes a small MVP definition so we can scope future work.
 ### 8) Screen awareness (screenshot + OCR)
 - Value: Answer "what is on my screen" and read alerts aloud.
 - MVP: On command, take a screenshot and OCR a single region.
+- Status: Done (screen OCR tool + optional region capture).
 - Touchpoints: new `engine/vision.py`, `gui/app.py`.
 - Risks: OCR accuracy and performance.
 - Done when: A user can ask for on-screen text and get a useful summary.

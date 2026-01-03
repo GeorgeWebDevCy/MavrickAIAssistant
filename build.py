@@ -71,6 +71,7 @@ args = [
     '--hidden-import=pystray',
     '--hidden-import=pyttsx3',
     '--hidden-import=vosk',
+    '--hidden-import=pytesseract',
     '--hidden-import=PIL._tkinter_finder',          # Fix for CTkImage
     '--hidden-import=babel.numbers',                # Common issue with some libs
     '--hidden-import=dotenv',                       # Explicitly import dotenv module
@@ -81,7 +82,8 @@ args = [
     '--collect-all=dotenv',                         # Collect pkg data
     '--collect-all=pystray',                        # Collect pystray data
     '--collect-all=pyttsx3',                        # Collect pyttsx3 data
-    '--collect-all=vosk'                            # Collect vosk data
+    '--collect-all=vosk',                           # Collect vosk data
+    '--collect-all=pytesseract'                     # Collect pytesseract data
 ]
 
 if venv_site_packages:

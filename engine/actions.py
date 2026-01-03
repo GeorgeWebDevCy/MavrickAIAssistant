@@ -6,6 +6,7 @@ import datetime
 import webbrowser
 import psutil
 import platform
+from engine import vision
 
 _DEFAULT_PROTOCOLS = {
     "work mode": ["start chrome https://github.com", "code", "calc"],
@@ -317,6 +318,21 @@ class MavrickActions:
             return f"Executing {action}."
         _audit_action("media_control", action, "blocked")
         return f"Unknown media action: {action}."
+
+    @staticmethod
+    def screen_ocr(region=None, save=False):
+        detail = "Full screen"
+        if isinstance(region, dict):
+            detail = f"Region {region}"
+        if not _confirm_action("Capture screen", detail):
+            _audit_action("screen_ocr", detail, "blocked")
+            return "Action canceled."
+        result = vision.screen_ocr(region=region, save=bool(save))
+        status = "executed"
+        if isinstance(result, str) and result.startswith("Error:"):
+            status = "failed"
+        _audit_action("screen_ocr", detail, status)
+        return result
 
     @staticmethod
     def get_system_stats():

@@ -173,6 +173,28 @@ class MavrickBrain:
             {
                 "type": "function",
                 "function": {
+                    "name": "screen_ocr",
+                    "description": "Capture the screen (or region) and read visible text.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "region": {
+                                "type": "object",
+                                "properties": {
+                                    "x": {"type": "integer"},
+                                    "y": {"type": "integer"},
+                                    "width": {"type": "integer"},
+                                    "height": {"type": "integer"}
+                                }
+                            },
+                            "save": {"type": "boolean"}
+                        }
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "switch_persona",
                     "description": "Change the assistant's persona, voice, and speaking style",
                     "parameters": {
@@ -249,6 +271,8 @@ class MavrickBrain:
                         result = MavrickActions.list_reminders()
                     elif func_name == "cancel_reminder":
                         result = MavrickActions.cancel_reminder(args["reminder_id"])
+                    elif func_name == "screen_ocr":
+                        result = MavrickActions.screen_ocr(args.get("region"), args.get("save", False))
                     elif func_name in self.skill_manager.skills:
                         result = self.skill_manager.execute(func_name, args)
                     else:
