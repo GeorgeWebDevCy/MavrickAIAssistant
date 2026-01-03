@@ -184,5 +184,25 @@ class MavrickAssistant:
         self.ui.mainloop()
 
 if __name__ == "__main__":
-    assistant = MavrickAssistant()
-    assistant.run()
+    try:
+        assistant = MavrickAssistant()
+        assistant.run()
+    except Exception as e:
+        import traceback
+        error_log = "mavrick_crash_log.txt"
+        with open(error_log, "w") as f:
+            f.write("CRITICAL SYSTEM FAILURE\n")
+            f.write("="*60 + "\n")
+            traceback.print_exc(file=f)
+            f.write("="*60 + "\n")
+        
+        try:
+            from tkinter import messagebox
+            import tkinter as tk
+            # Ensure we have a root window for the messagebox
+            root = tk.Tk()
+            root.withdraw() # Hide the main window
+            messagebox.showerror("Critical Error", f"Mavrick crashed.\nError details written to:\n{error_log}")
+            root.destroy()
+        except:
+            pass
