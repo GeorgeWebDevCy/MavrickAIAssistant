@@ -58,6 +58,7 @@ class MavrickAssistant:
         self.tray = TrayController(
             self.ui._icon_path,
             on_show=self.show_hud,
+            on_help=self.show_help,
             on_listen=self.start_voice_thread,
             on_toggle_mute=self.toggle_mute,
             on_exit=self.shutdown
@@ -149,6 +150,15 @@ class MavrickAssistant:
     def show_hud(self):
         try:
             self.ui.after(0, self.ui.show_from_tray)
+        except Exception:
+            pass
+
+    def show_help(self):
+        def _show():
+            self.ui.show_from_tray()
+            self.ui.open_help()
+        try:
+            self.ui.after(0, _show)
         except Exception:
             pass
 

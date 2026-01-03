@@ -30,7 +30,7 @@ Each feature includes a small MVP definition so we can scope future work.
 ### 3) Tray mode + quick actions
 - Value: Run in background with a taskbar tray menu (listen, mute, open HUD).
 - MVP: Minimize-to-tray and a small menu with 3-5 actions.
-- Status: Done (tray icon + listen/mute/open/exit actions).
+- Status: Done (tray icon + open/help/listen/mute/exit actions).
 - Touchpoints: `main.py`, `gui/app.py`, add dependency (likely `pystray`).
 - Risks: Tray integration differences on Windows.
 - Done when: Closing the HUD keeps the assistant alive and tray controls work.
@@ -82,8 +82,8 @@ Each feature includes a small MVP definition so we can scope future work.
 ### 16) Help screen + app guide
 - Value: Explain what the app can do and how to use it.
 - MVP: A help window covering core capabilities, usage tips, and shortcuts.
-- Status: Done (help window with features + shortcuts).
-- Touchpoints: `gui/app.py`.
+- Status: Done (help window with features + shortcuts + tray entry).
+- Touchpoints: `gui/app.py`, `gui/tray.py`, `main.py`.
 
 ## Mid-term (1-3 months)
 

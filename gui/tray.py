@@ -12,9 +12,10 @@ except Exception:
 
 
 class TrayController:
-    def __init__(self, icon_path, on_show=None, on_listen=None, on_toggle_mute=None, on_exit=None):
+    def __init__(self, icon_path, on_show=None, on_help=None, on_listen=None, on_toggle_mute=None, on_exit=None):
         self.icon_path = icon_path
         self.on_show = on_show
+        self.on_help = on_help
         self.on_listen = on_listen
         self.on_toggle_mute = on_toggle_mute
         self.on_exit = on_exit
@@ -57,6 +58,7 @@ class TrayController:
             image = self._load_icon_image()
             menu = pystray.Menu(
                 pystray.MenuItem("Open HUD", self._handle_open),
+                pystray.MenuItem("Help", self._handle_help),
                 pystray.MenuItem("Listen", self._handle_listen),
                 pystray.MenuItem("Mute", self._handle_toggle_mute, checked=self._is_muted),
                 pystray.MenuItem("Exit", self._handle_exit)
@@ -88,6 +90,10 @@ class TrayController:
     def _handle_open(self, icon, item):
         if self.on_show:
             self.on_show()
+
+    def _handle_help(self, icon, item):
+        if self.on_help:
+            self.on_help()
 
     def _handle_listen(self, icon, item):
         if self.on_listen:

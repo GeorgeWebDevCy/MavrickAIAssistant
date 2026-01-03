@@ -80,7 +80,8 @@ class MavrickUI(ctk.CTk):
         self._note_input = None
         self._note_id_entry = None
         self._help_window = None
-        self._help_text = None
+        self._help_scroll = None
+        self._help_shortcuts_frame = None
         self._shortcuts = []
         self._protocols_cache = {}
         self._protocol_var = None
@@ -886,44 +887,119 @@ class MavrickUI(ctk.CTk):
             self._command_entry.focus_set()
             self._command_entry.icursor("end")
 
-    def _build_shortcuts_lines(self):
-        lines = []
-        for keys, description in self._shortcuts:
-            lines.append(f"{keys} - {description}")
-        return lines
+    def _help_section(self, parent, title, lines):
+        frame = ctk.CTkFrame(
+            parent,
+            fg_color="#0b1114",
+            corner_radius=10,
+            border_width=1,
+            border_color=self.dim_cyan
+        )
+        frame.pack(fill="x", padx=12, pady=(0, 12))
 
-    def _build_help_lines(self):
-        lines = [
-            "MAVRICK HUD HELP",
-            "",
-            "WHAT IT CAN DO",
-            "- Voice and typed commands with on-screen responses.",
-            "- Open apps, run protocols, and confirm risky actions.",
-            "- Manage reminders, notes, and command history.",
-            "- View session log and action audit log.",
-            "- Screen OCR on demand and weather updates.",
-            "- Load skills, switch personas, and change voice settings.",
-            "- Run in the system tray with quick actions.",
-            "",
-            "HOW TO USE",
-            "1) Press Ctrl+Space or click ENGAGE HYPERLINK to speak.",
-            "2) Type a command and press Enter to run it.",
-            "3) Use the side buttons for protocols, logs, notes, reminders, and settings.",
-            "",
-            "SHORTCUTS",
-        ]
-        shortcuts = self._build_shortcuts_lines()
-        if shortcuts:
-            lines.extend(shortcuts)
-        else:
-            lines.append("No shortcuts registered.")
-        lines.extend([
-            "",
-            "TIPS",
-            "- Close button hides the HUD to the tray (if available).",
-            "- Use the tray icon to re-open the HUD or toggle mute.",
-        ])
-        return lines
+        title_label = ctk.CTkLabel(
+            frame,
+            text=title,
+            font=("Orbitron", 12, "bold"),
+            text_color=self.primary_cyan
+        )
+        title_label.pack(anchor="w", padx=10, pady=(8, 4))
+
+        body = ctk.CTkLabel(
+            frame,
+            text="\n".join(lines),
+            font=("Consolas", 10),
+            text_color=self.secondary_teal,
+            justify="left",
+            wraplength=520
+        )
+        body.pack(anchor="w", padx=10, pady=(0, 8))
+        return frame
+
+    def _help_chips(self, parent, labels):
+        frame = ctk.CTkFrame(
+            parent,
+            fg_color="#0b1114",
+            corner_radius=10,
+            border_width=1,
+            border_color=self.dim_cyan
+        )
+        frame.pack(fill="x", padx=12, pady=(0, 12))
+
+        title = ctk.CTkLabel(
+            frame,
+            text="SYSTEM MODULES",
+            font=("Orbitron", 12, "bold"),
+            text_color=self.primary_cyan
+        )
+        title.pack(anchor="w", padx=10, pady=(8, 4))
+
+        grid = ctk.CTkFrame(frame, fg_color="transparent")
+        grid.pack(fill="x", padx=8, pady=(0, 10))
+        grid.grid_columnconfigure(0, weight=1)
+        grid.grid_columnconfigure(1, weight=1)
+        grid.grid_columnconfigure(2, weight=1)
+
+        for idx, label in enumerate(labels):
+            chip = ctk.CTkLabel(
+                grid,
+                text=label,
+                font=("Consolas", 9),
+                text_color=self.primary_cyan,
+                fg_color="#08242b",
+                corner_radius=10
+            )
+            row = idx // 3
+            col = idx % 3
+            chip.grid(row=row, column=col, padx=6, pady=6, sticky="w")
+        return frame
+
+    def _help_shortcuts(self, parent):
+        frame = ctk.CTkFrame(
+            parent,
+            fg_color="#0b1114",
+            corner_radius=10,
+            border_width=1,
+            border_color=self.dim_cyan
+        )
+        frame.pack(fill="x", padx=12, pady=(0, 12))
+
+        title = ctk.CTkLabel(
+            frame,
+            text="SHORTCUTS",
+            font=("Orbitron", 12, "bold"),
+            text_color=self.primary_cyan
+        )
+        title.pack(anchor="w", padx=10, pady=(8, 4))
+
+        table = ctk.CTkFrame(frame, fg_color="transparent")
+        table.pack(fill="x", padx=10, pady=(0, 10))
+        table.grid_columnconfigure(0, weight=0)
+        table.grid_columnconfigure(1, weight=1)
+
+        key_header = ctk.CTkLabel(table, text="KEY", font=("Consolas", 10, "bold"), text_color=self.primary_cyan)
+        action_header = ctk.CTkLabel(table, text="ACTION", font=("Consolas", 10, "bold"), text_color=self.primary_cyan)
+        key_header.grid(row=0, column=0, sticky="w", padx=(0, 12), pady=(0, 6))
+        action_header.grid(row=0, column=1, sticky="w", pady=(0, 6))
+
+        for row, (keys, description) in enumerate(self._shortcuts, start=1):
+            key_label = ctk.CTkLabel(
+                table,
+                text=keys,
+                font=("Consolas", 10, "bold"),
+                text_color=self.primary_cyan
+            )
+            desc_label = ctk.CTkLabel(
+                table,
+                text=description,
+                font=("Consolas", 10),
+                text_color=self.secondary_teal,
+                justify="left",
+                wraplength=360
+            )
+            key_label.grid(row=row, column=0, sticky="w", padx=(0, 12), pady=2)
+            desc_label.grid(row=row, column=1, sticky="w", pady=2)
+        return frame
 
     def open_help(self):
         if self._help_window and self._help_window.winfo_exists():
@@ -932,35 +1008,146 @@ class MavrickUI(ctk.CTk):
 
         self._help_window = ctk.CTkToplevel(self)
         self._help_window.title("Help")
-        self._help_window.geometry("600x520")
+        self._help_window.geometry("660x640")
         self._help_window.resizable(False, False)
+        self._help_window.configure(fg_color=self.bg_black)
         try:
             self._help_window.iconbitmap(self._icon_path)
         except Exception:
             pass
 
-        title = ctk.CTkLabel(self._help_window, text="HELP", font=("Orbitron", 16, "bold"), text_color=self.primary_cyan)
-        title.pack(pady=(10, 6))
+        header = ctk.CTkFrame(
+            self._help_window,
+            fg_color="#0b1114",
+            corner_radius=12,
+            border_width=1,
+            border_color=self.dim_cyan
+        )
+        header.pack(fill="x", padx=12, pady=(12, 10))
 
-        self._help_text = ctk.CTkTextbox(self._help_window, height=360)
-        self._help_text.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        title = ctk.CTkLabel(
+            header,
+            text="MAVRICK // SYSTEM DOSSIER",
+            font=("Orbitron", 16, "bold"),
+            text_color=self.primary_cyan
+        )
+        title.pack(anchor="w", padx=12, pady=(10, 2))
+
+        subtitle = ctk.CTkLabel(
+            header,
+            text="Capabilities, controls, and shortcuts",
+            font=("Consolas", 10),
+            text_color=self.secondary_teal
+        )
+        subtitle.pack(anchor="w", padx=12, pady=(0, 8))
+
+        status_frame = ctk.CTkFrame(header, fg_color="transparent")
+        status_frame.pack(anchor="w", padx=12, pady=(0, 10))
+
+        status_chip = ctk.CTkLabel(
+            status_frame,
+            text="STATUS: ONLINE",
+            font=("Consolas", 10, "bold"),
+            text_color=self.primary_cyan,
+            fg_color=self.dim_cyan,
+            corner_radius=8
+        )
+        status_chip.pack(side="left")
+
+        hint_chip = ctk.CTkLabel(
+            status_frame,
+            text="PRESS F1 FOR HELP",
+            font=("Consolas", 10),
+            text_color=self.secondary_teal,
+            fg_color="#0c1d23",
+            corner_radius=8
+        )
+        hint_chip.pack(side="left", padx=8)
+
+        self._help_scroll = ctk.CTkScrollableFrame(self._help_window, fg_color="transparent")
+        self._help_scroll.pack(fill="both", expand=True, padx=4, pady=(0, 8))
+
+        self._help_chips(
+            self._help_scroll,
+            [
+                "Voice Control",
+                "Typed Commands",
+                "Protocols",
+                "Reminders",
+                "Notes",
+                "Command History",
+                "Action Log",
+                "Session Log",
+                "Screen OCR",
+                "Weather",
+                "Skills",
+                "Personas",
+                "Tray Mode"
+            ]
+        )
+
+        self._help_section(
+            self._help_scroll,
+            "QUICK START",
+            [
+                "1) Press Ctrl+Space or click ENGAGE HYPERLINK to listen.",
+                "2) Speak a command or type one and press Enter.",
+                "3) Confirm risky actions when prompted.",
+                "4) Use side buttons for protocols, logs, notes, reminders, and settings."
+            ]
+        )
+
+        self._help_section(
+            self._help_scroll,
+            "CORE CAPABILITIES",
+            [
+                "- Open apps, run protocols, and automate workflows.",
+                "- Create reminders, manage notes, and reuse command history.",
+                "- View session logs and action audits for transparency.",
+                "- Capture screen text with OCR and pull weather updates.",
+                "- Load skills, switch personas, and customize voice settings."
+            ]
+        )
+
+        self._help_section(
+            self._help_scroll,
+            "VOICE COMMAND IDEAS",
+            [
+                "- \"Open chrome\"",
+                "- \"Run work mode\"",
+                "- \"Remind me in 30 minutes to hydrate\"",
+                "- \"Add note buy new headset\"",
+                "- \"List notes\"",
+                "- \"What's on my screen?\""
+            ]
+        )
+
+        self._help_section(
+            self._help_scroll,
+            "SAFETY + CONTROL",
+            [
+                "- Risky actions request confirmation.",
+                "- The tray menu lets you open HUD, listen, mute, or exit.",
+                "- Closing the HUD hides it to tray when available."
+            ]
+        )
+
+        self._help_section(
+            self._help_scroll,
+            "DATA + LOGS",
+            [
+                "- User data is stored under %APPDATA%\\MavrickAI.",
+                "- Logs include actions.log, session.log, notes.json, reminders, and history."
+            ]
+        )
+
+        self._help_shortcuts(self._help_scroll)
 
         btn_frame = ctk.CTkFrame(self._help_window, fg_color="transparent")
         btn_frame.pack(fill="x", padx=12, pady=(0, 10))
 
         close_btn = ctk.CTkButton(btn_frame, text="Close", width=90, command=self._help_window.destroy)
         close_btn.pack(side="right")
-
-        self._render_help()
-
-    def _render_help(self):
-        if not self._help_text:
-            return
-        lines = self._build_help_lines()
-        self._help_text.configure(state="normal")
-        self._help_text.delete("1.0", "end")
-        self._help_text.insert("end", "\n".join(lines))
-        self._help_text.configure(state="disabled")
 
     def open_shortcuts(self):
         self.open_help()
