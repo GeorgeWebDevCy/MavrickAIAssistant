@@ -76,7 +76,13 @@ Each feature includes a small MVP definition so we can scope future work.
 ### 15) Keyboard shortcuts + shortcuts guide
 - Value: Faster navigation and quick shortcut discovery.
 - MVP: Global keyboard shortcuts for core HUD actions plus a shortcuts window (F1/Ctrl+/).
-- Status: Done (global binds + shortcuts window + HUD button).
+- Status: Done (global binds + help/shortcuts window + HUD button).
+- Touchpoints: `gui/app.py`.
+
+### 16) Help screen + app guide
+- Value: Explain what the app can do and how to use it.
+- MVP: A help window covering core capabilities, usage tips, and shortcuts.
+- Status: Done (help window with features + shortcuts).
 - Touchpoints: `gui/app.py`.
 
 ## Mid-term (1-3 months)

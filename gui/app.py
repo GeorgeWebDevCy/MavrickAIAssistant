@@ -79,8 +79,8 @@ class MavrickUI(ctk.CTk):
         self._notes_text = None
         self._note_input = None
         self._note_id_entry = None
-        self._shortcuts_window = None
-        self._shortcuts_text = None
+        self._help_window = None
+        self._help_text = None
         self._shortcuts = []
         self._protocols_cache = {}
         self._protocol_var = None
@@ -286,8 +286,8 @@ class MavrickUI(ctk.CTk):
         self.btn_settings = ctk.CTkButton(self, text="SETTINGS", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_settings)
         self.btn_settings.pack(pady=5, padx=40, fill="x")
 
-        self.btn_shortcuts = ctk.CTkButton(self, text="SHORTCUTS", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_shortcuts)
-        self.btn_shortcuts.pack(pady=5, padx=40, fill="x")
+        self.btn_help = ctk.CTkButton(self, text="HELP", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_help)
+        self.btn_help.pack(pady=5, padx=40, fill="x")
 
         self.btn_exit = ctk.CTkButton(self, text="TERMINATE CONNECTION", font=("Consolas", 10), fg_color="transparent", border_width=1, border_color=self.alert_red, text_color=self.alert_red, command=self.destroy)
         self.btn_exit.pack(pady=5)
@@ -792,8 +792,8 @@ class MavrickUI(ctk.CTk):
         self._register_shortcut(
             patterns=["<F1>", "<Control-slash>"],
             label="F1 / Ctrl+/",
-            description="Show shortcuts",
-            handler=self.open_shortcuts
+            description="Open help and shortcuts",
+            handler=self.open_help
         )
         self._register_shortcut(
             patterns=["<Control-space>"],
@@ -886,47 +886,84 @@ class MavrickUI(ctk.CTk):
             self._command_entry.focus_set()
             self._command_entry.icursor("end")
 
-    def open_shortcuts(self):
-        if self._shortcuts_window and self._shortcuts_window.winfo_exists():
-            self._shortcuts_window.focus()
-            return
-
-        self._shortcuts_window = ctk.CTkToplevel(self)
-        self._shortcuts_window.title("Shortcuts")
-        self._shortcuts_window.geometry("520x360")
-        self._shortcuts_window.resizable(False, False)
-        try:
-            self._shortcuts_window.iconbitmap(self._icon_path)
-        except Exception:
-            pass
-
-        title = ctk.CTkLabel(self._shortcuts_window, text="SHORTCUTS", font=("Orbitron", 16, "bold"), text_color=self.primary_cyan)
-        title.pack(pady=(10, 6))
-
-        self._shortcuts_text = ctk.CTkTextbox(self._shortcuts_window, height=220)
-        self._shortcuts_text.pack(fill="both", expand=True, padx=12, pady=(0, 8))
-
-        btn_frame = ctk.CTkFrame(self._shortcuts_window, fg_color="transparent")
-        btn_frame.pack(fill="x", padx=12, pady=(0, 10))
-
-        close_btn = ctk.CTkButton(btn_frame, text="Close", width=90, command=self._shortcuts_window.destroy)
-        close_btn.pack(side="right")
-
-        self._render_shortcuts()
-
-    def _render_shortcuts(self):
-        if not self._shortcuts_text:
-            return
+    def _build_shortcuts_lines(self):
         lines = []
         for keys, description in self._shortcuts:
             lines.append(f"{keys} - {description}")
-        if not lines:
-            lines.append("No shortcuts registered.")
+        return lines
 
-        self._shortcuts_text.configure(state="normal")
-        self._shortcuts_text.delete("1.0", "end")
-        self._shortcuts_text.insert("end", "\n".join(lines))
-        self._shortcuts_text.configure(state="disabled")
+    def _build_help_lines(self):
+        lines = [
+            "MAVRICK HUD HELP",
+            "",
+            "WHAT IT CAN DO",
+            "- Voice and typed commands with on-screen responses.",
+            "- Open apps, run protocols, and confirm risky actions.",
+            "- Manage reminders, notes, and command history.",
+            "- View session log and action audit log.",
+            "- Screen OCR on demand and weather updates.",
+            "- Load skills, switch personas, and change voice settings.",
+            "- Run in the system tray with quick actions.",
+            "",
+            "HOW TO USE",
+            "1) Press Ctrl+Space or click ENGAGE HYPERLINK to speak.",
+            "2) Type a command and press Enter to run it.",
+            "3) Use the side buttons for protocols, logs, notes, reminders, and settings.",
+            "",
+            "SHORTCUTS",
+        ]
+        shortcuts = self._build_shortcuts_lines()
+        if shortcuts:
+            lines.extend(shortcuts)
+        else:
+            lines.append("No shortcuts registered.")
+        lines.extend([
+            "",
+            "TIPS",
+            "- Close button hides the HUD to the tray (if available).",
+            "- Use the tray icon to re-open the HUD or toggle mute.",
+        ])
+        return lines
+
+    def open_help(self):
+        if self._help_window and self._help_window.winfo_exists():
+            self._help_window.focus()
+            return
+
+        self._help_window = ctk.CTkToplevel(self)
+        self._help_window.title("Help")
+        self._help_window.geometry("600x520")
+        self._help_window.resizable(False, False)
+        try:
+            self._help_window.iconbitmap(self._icon_path)
+        except Exception:
+            pass
+
+        title = ctk.CTkLabel(self._help_window, text="HELP", font=("Orbitron", 16, "bold"), text_color=self.primary_cyan)
+        title.pack(pady=(10, 6))
+
+        self._help_text = ctk.CTkTextbox(self._help_window, height=360)
+        self._help_text.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+
+        btn_frame = ctk.CTkFrame(self._help_window, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=12, pady=(0, 10))
+
+        close_btn = ctk.CTkButton(btn_frame, text="Close", width=90, command=self._help_window.destroy)
+        close_btn.pack(side="right")
+
+        self._render_help()
+
+    def _render_help(self):
+        if not self._help_text:
+            return
+        lines = self._build_help_lines()
+        self._help_text.configure(state="normal")
+        self._help_text.delete("1.0", "end")
+        self._help_text.insert("end", "\n".join(lines))
+        self._help_text.configure(state="disabled")
+
+    def open_shortcuts(self):
+        self.open_help()
 
     def set_text_command_callback(self, callback):
         self._text_command_callback = callback
