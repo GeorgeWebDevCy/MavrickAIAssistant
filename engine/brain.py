@@ -3,6 +3,7 @@ import json
 from openai import OpenAI
 from dotenv import load_dotenv
 from engine.actions import MavrickActions
+from engine.skills import SkillManager
 
 load_dotenv(override=True)
 
@@ -13,7 +14,7 @@ class MavrickBrain:
         summary_text = summary.strip() if isinstance(summary, str) else ""
         self.summary = summary_text
         self.memory = [
-            {"role": "system", "content": f"You are Mavrick, a highly intelligent AI assistant (like JARVIS). You are helpful and witty. You have access to system tools. Use them to help the user with time, date, opening apps, searching the web, system stats, media control, reminders, and running complex protocols. Protocols are user-defined; call list_protocols to see available names. You can also switch your persona between Mavrick (default), Jarvis (polite/British), and Friday (efficient/sharp)."}
+            {"role": "system", "content": f"You are Mavrick, a highly intelligent AI assistant (like JARVIS). You are helpful and witty. You have access to system tools. Use them to help the user with time, date, opening apps, searching the web, system stats, media control, reminders, custom skills, and running complex protocols. Protocols are user-defined; call list_protocols to see available names. Custom skills may be available; call list_skills to see what's loaded. You can also switch your persona between Mavrick (default), Jarvis (polite/British), and Friday (efficient/sharp)."}
         ]
         if summary_text:
             self.memory.append({"role": "system", "content": f"Memory summary (previous session): {summary_text}"})
@@ -28,12 +29,15 @@ class MavrickBrain:
             self.current_balance = 0.0
         
         self.debug_mode = os.getenv("DEBUG_MODE", "False") == "True"
+        self.skill_manager = SkillManager()
+        self.tools = self._build_tools()
 
     def log_debug(self, msg):
         if self.debug_mode:
             print(f" [DEBUG] [BRAIN]: {msg}")
-        
-        self.tools = [
+
+    def _build_tools(self):
+        tools = [
             {
                 "type": "function",
                 "function": {
@@ -95,6 +99,17 @@ class MavrickBrain:
                 "function": {
                     "name": "list_protocols",
                     "description": "List available protocol names",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {}
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "list_skills",
+                    "description": "List available custom skills",
                     "parameters": {
                         "type": "object",
                         "properties": {}
@@ -171,6 +186,9 @@ class MavrickBrain:
             }
         ]
 
+        tools.extend(self.skill_manager.get_tools())
+        return tools
+
     def get_response(self, user_input):
         if self.current_balance <= 0:
             return f"I apologize, {self.user_name}, but your OpenAI balance has reached zero. Please top up your account to continue our interaction."
@@ -219,12 +237,22 @@ class MavrickBrain:
                             result = "Available protocols: " + ", ".join(protocols)
                         else:
                             result = "No protocols are available."
+                    elif func_name == "list_skills":
+                        skills = self.skill_manager.list_skills()
+                        if skills:
+                            result = "Available skills: " + ", ".join(skills)
+                        else:
+                            result = "No skills are loaded."
                     elif func_name == "schedule_reminder":
                         result = MavrickActions.schedule_reminder(args["message"], args["when"])
                     elif func_name == "list_reminders":
                         result = MavrickActions.list_reminders()
                     elif func_name == "cancel_reminder":
                         result = MavrickActions.cancel_reminder(args["reminder_id"])
+                    elif func_name in self.skill_manager.skills:
+                        result = self.skill_manager.execute(func_name, args)
+                    else:
+                        result = f"Unknown tool: {func_name}"
                     
                     self.log_debug(f"TOOL RESULT: {result[:50]}...")
                     # Append each tool response

@@ -1,9 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('C:\\Users\\georg\\OneDrive\\Desktop\\MavrickAIAssistant\\venv\\Lib\\site-packages\\customtkinter', 'customtkinter/'), ('assets', 'assets/'), ('data', 'data/'), ('C:\\Users\\georg\\OneDrive\\Desktop\\MavrickAIAssistant\\venv\\Lib\\site-packages\\dotenv', 'dotenv/')]
+datas = [('C:\\Users\\georg\\OneDrive\\Desktop\\MavrickAIAssistant\\venv\\Lib\\site-packages\\customtkinter', 'customtkinter/'), ('assets', 'assets/'), ('data', 'data/'), ('skills', 'skills/'), ('C:\\Users\\georg\\OneDrive\\Desktop\\MavrickAIAssistant\\venv\\Lib\\site-packages\\dotenv', 'dotenv/')]
 binaries = []
-hiddenimports = ['engine', 'engine.voice', 'engine.brain', 'engine.actions', 'engine.weather', 'engine.profile', 'engine.scheduler', 'PIL._tkinter_finder', 'babel.numbers', 'dotenv']
+hiddenimports = ['engine', 'engine.voice', 'engine.brain', 'engine.actions', 'engine.weather', 'engine.profile', 'engine.scheduler', 'engine.skills', 'PIL._tkinter_finder', 'babel.numbers', 'dotenv']
 tmp_ret = collect_all('psutil')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('speech_recognition')

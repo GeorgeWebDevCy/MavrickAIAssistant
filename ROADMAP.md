@@ -55,6 +55,7 @@ Each feature includes a small MVP definition so we can scope future work.
 ### 6) Skills / plugin system
 - Value: Extend Mavrick without editing core code.
 - MVP: Load skills from a `skills/` folder with a small manifest format.
+- Status: Done (skills loader + tool integration + sample skill).
 - Touchpoints: `engine/brain.py`, new `engine/skills.py`.
 - Risks: API stability and skill isolation.
 - Done when: Dropping a new skill folder registers new commands.
@@ -62,6 +63,7 @@ Each feature includes a small MVP definition so we can scope future work.
 ### 7) HUD telemetry upgrade
 - Value: More "sci-fi" and practical stats (network, GPU, disk, alerts).
 - MVP: Add network throughput and disk activity to the HUD.
+- Status: Done (network + disk throughput added to HUD).
 - Touchpoints: `gui/app.py`, `engine/actions.py`.
 - Risks: Polling cost and UI clutter.
 - Done when: New stats render smoothly without affecting performance.

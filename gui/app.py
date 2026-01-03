@@ -111,6 +111,10 @@ class MavrickUI(ctk.CTk):
         # System Stats
         self.cpu_usage = 0
         self.ram_usage = 0
+        self.net_down_bps = 0.0
+        self.net_up_bps = 0.0
+        self.disk_read_bps = 0.0
+        self.disk_write_bps = 0.0
         
         # Audio Stream for Visualizer
         self.p = pyaudio.PyAudio()
@@ -188,8 +192,10 @@ class MavrickUI(ctk.CTk):
             ("ENC: RSA-4096", 40, 120),
             ("BIT: 128-FLOAT", 40, 280),
             ("CPU: MONITOR", 340, 120),
-            ("RAM: MONITOR", 340, 280),
-            ("WTH: SCANNING...", 340, 200) # Weather Label
+            ("NET: D 0.0KB/s U 0.0KB/s", 340, 160),
+            ("WTH: SCANNING...", 340, 200), # Weather Label
+            ("DSK: R 0.0KB/s W 0.0KB/s", 340, 240),
+            ("RAM: MONITOR", 340, 280)
         ]
         for text, x, y in data_configs:
             lbl = ctk.CTkLabel(self, text=text, font=("Consolas", 9), text_color=self.secondary_teal)
@@ -533,6 +539,15 @@ class MavrickUI(ctk.CTk):
             return
         MavrickActions.clear_reminders()
         self._load_reminders()
+
+    def _format_rate(self, bytes_per_sec):
+        try:
+            rate = float(bytes_per_sec)
+        except Exception:
+            rate = 0.0
+        if rate >= 1024 * 1024:
+            return f"{rate / (1024 * 1024):.1f}MB/s"
+        return f"{rate / 1024:.1f}KB/s"
         
     def log_message(self, message):
         self.log_box.insert("end", f"{message}\n")
@@ -551,9 +566,30 @@ class MavrickUI(ctk.CTk):
         
     def start_monitor_thread(self):
         def monitor():
+            last_net = psutil.net_io_counters()
+            last_disk = psutil.disk_io_counters()
+            last_time = time.time()
             while True:
                 self.cpu_usage = psutil.cpu_percent()
                 self.ram_usage = psutil.virtual_memory().percent
+                now = time.time()
+                elapsed = now - last_time
+                if elapsed <= 0:
+                    elapsed = 1.0
+                try:
+                    net = psutil.net_io_counters()
+                    disk = psutil.disk_io_counters()
+                    if net and last_net:
+                        self.net_down_bps = max(0.0, (net.bytes_recv - last_net.bytes_recv) / elapsed)
+                        self.net_up_bps = max(0.0, (net.bytes_sent - last_net.bytes_sent) / elapsed)
+                        last_net = net
+                    if disk and last_disk:
+                        self.disk_read_bps = max(0.0, (disk.read_bytes - last_disk.read_bytes) / elapsed)
+                        self.disk_write_bps = max(0.0, (disk.write_bytes - last_disk.write_bytes) / elapsed)
+                        last_disk = disk
+                except Exception:
+                    pass
+                last_time = now
                 time.sleep(1)
         threading.Thread(target=monitor, daemon=True).start()
 
@@ -706,10 +742,12 @@ class MavrickUI(ctk.CTk):
         hex_color = f"#{0:02x}{color_int:02x}{255:02x}"
         self.canvas.itemconfig(self.inner_circle, fill=hex_color)
 
-        # Update CPU/RAM labels
-        if len(self.data_labels) > 3: # Ensure labels exist
+        # Update CPU/RAM/NET/DSK labels
+        if len(self.data_labels) > 6: # Ensure labels exist
             self.data_labels[2].configure(text=f"CPU: {self.cpu_usage:.0f}%")
-            self.data_labels[3].configure(text=f"RAM: {self.ram_usage:.0f}%")
+            self.data_labels[3].configure(text=f"NET: D {self._format_rate(self.net_down_bps)} U {self._format_rate(self.net_up_bps)}")
+            self.data_labels[5].configure(text=f"DSK: R {self._format_rate(self.disk_read_bps)} W {self._format_rate(self.disk_write_bps)}")
+            self.data_labels[6].configure(text=f"RAM: {self.ram_usage:.0f}%")
 
         self.update_visualizer()
         self.after(30, self.animate_hud)

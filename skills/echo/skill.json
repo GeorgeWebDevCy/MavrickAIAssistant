@@ -1,0 +1,18 @@
+{
+  "name": "echo",
+  "description": "Echo back the provided text.",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "text": {
+        "type": "string",
+        "description": "Text to echo back"
+      }
+    },
+    "required": [
+      "text"
+    ]
+  },
+  "entrypoint": "skill.py:run",
+  "enabled": true
+}
