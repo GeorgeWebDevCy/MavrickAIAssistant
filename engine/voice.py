@@ -6,6 +6,18 @@ import pygame
 import tempfile
 import threading
 import time
+import json
+import sys
+
+try:
+    import pyttsx3
+except Exception:
+    pyttsx3 = None
+
+try:
+    import vosk
+except Exception:
+    vosk = None
 
 load_dotenv(override=True)
 
@@ -27,6 +39,13 @@ class VoiceEngine:
         self.debug_mode = os.getenv("DEBUG_MODE", "False") == "True"
         self.muted = False
         self.wake_words = self._normalize_wake_words(wake_words)
+        self.offline_tts = os.getenv("OFFLINE_TTS", "False").lower() == "true"
+        self.offline_stt = os.getenv("OFFLINE_STT", "False").lower() == "true"
+        self._tts_engine = None
+        self._vosk_model = None
+        self._vosk_model_path = self._resolve_vosk_path()
+        if self._vosk_model_path:
+            self.offline_stt = True
 
         self.recognizer = sr.Recognizer()
         self.recognizer.energy_threshold = 400
@@ -52,6 +71,29 @@ class VoiceEngine:
     def log_debug(self, msg):
         if self.debug_mode:
             print(f" [DEBUG] [VOICE]: {msg}")
+
+    def _asset_base_dir(self):
+        return getattr(sys, "_MEIPASS", os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+    def _resolve_vosk_path(self):
+        env_path = os.getenv("VOSK_MODEL_PATH", "").strip()
+        if env_path and os.path.isdir(env_path):
+            return env_path
+        candidate = os.path.join(self._asset_base_dir(), "data", "vosk")
+        if os.path.isdir(candidate):
+            return candidate
+        return ""
+
+    def _ensure_vosk_model(self):
+        if self._vosk_model or not self._vosk_model_path or not vosk:
+            return self._vosk_model is not None
+        try:
+            self._vosk_model = vosk.Model(self._vosk_model_path)
+            return True
+        except Exception as exc:
+            self.log_debug(f"Vosk model load failed: {exc}")
+            self._vosk_model = None
+            return False
 
     def _voice_for_persona(self, persona):
         voices = {
@@ -90,6 +132,29 @@ class VoiceEngine:
         if name in self.ui_sounds:
             self.ui_sounds[name].play()
 
+    def _ensure_tts_engine(self):
+        if self._tts_engine or not pyttsx3:
+            return self._tts_engine is not None
+        try:
+            self._tts_engine = pyttsx3.init()
+            self._tts_engine.setProperty("rate", 180)
+            return True
+        except Exception as exc:
+            self.log_debug(f"pyttsx3 init failed: {exc}")
+            self._tts_engine = None
+            return False
+
+    def _speak_offline(self, text):
+        if not self._ensure_tts_engine():
+            return False
+        try:
+            self._tts_engine.say(text)
+            self._tts_engine.runAndWait()
+            return True
+        except Exception as exc:
+            self.log_debug(f"Offline TTS failed: {exc}")
+            return False
+
     def speak(self, text):
         print(f"Mavrick: {text}")
         if self.muted:
@@ -97,6 +162,9 @@ class VoiceEngine:
         self.total_chars += len(text)
         # OpenAI TTS costs $0.015 per 1,000 characters
         self.total_cost += (len(text) / 1000) * 0.015
+        if self.offline_tts:
+            if self._speak_offline(text):
+                return
         try:
             # Generate speech using OpenAI TTS
             response = self.client.audio.speech.create(
@@ -134,7 +202,28 @@ class VoiceEngine:
         except Exception as e:
             print(f"TTS Error: {repr(e)}")
             # Fallback to local TTS if needed or just print
-            print(f"Mavrick (Text Only): {text}")
+            if not self._speak_offline(text):
+                print(f"Mavrick (Text Only): {text}")
+
+    def _recognize_audio(self, recognizer, audio):
+        if self.offline_stt and self._ensure_vosk_model():
+            try:
+                if hasattr(recognizer, "recognize_vosk"):
+                    result = recognizer.recognize_vosk(audio, model=self._vosk_model)
+                else:
+                    result = recognizer.recognize_google(audio, language="en-in")
+                if isinstance(result, str) and result.strip().startswith("{"):
+                    data = json.loads(result)
+                    return data.get("text", "").strip()
+                if isinstance(result, dict):
+                    return str(result.get("text", "")).strip()
+                return str(result).strip()
+            except Exception as exc:
+                self.log_debug(f"Offline STT failed: {exc}")
+        try:
+            return recognizer.recognize_google(audio, language="en-in")
+        except Exception:
+            return "None"
 
     def listen(self):
         with sr.Microphone() as source:
@@ -145,13 +234,10 @@ class VoiceEngine:
             except sr.WaitTimeoutError:
                 return "None"
 
-        try:
-            print("Recognizing command...")
-            query = self.recognizer.recognize_google(audio, language='en-in')
-            print(f"User said: {query}\n")
-            return query
-        except Exception:
-            return "None"
+        print("Recognizing command...")
+        query = self._recognize_audio(self.recognizer, audio)
+        print(f"User said: {query}\n")
+        return query
 
     def start_background_listening(self, callback_func, check_active_func):
         self.is_listening = True
@@ -193,7 +279,7 @@ class VoiceEngine:
                         
                         if self.check_active(): continue
                         
-                        text = bg_recognizer.recognize_google(audio, language='en-in').lower()
+                        text = self._recognize_audio(bg_recognizer, audio).lower()
                         self.log_debug(f"Heard (Low Confidence): '{text}'")
                         
                         if any(word in text for word in self.wake_words):

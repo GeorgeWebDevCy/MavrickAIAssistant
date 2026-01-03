@@ -22,7 +22,7 @@ Each feature includes a small MVP definition so we can scope future work.
 ### 2) Protocol builder (custom workflows)
 - Value: Users define their own "work mode" or "gaming mode" commands.
 - MVP: JSON-driven protocol list with a simple editor window to add/edit/delete.
-- Status: In progress (protocol storage + editor UI wired).
+- Status: Done (protocol storage + editor UI + voice execution).
 - Touchpoints: `engine/actions.py`, `gui/app.py`, new `data/protocols.json`.
 - Risks: Misconfigured commands, security concerns for arbitrary shell calls.
 - Done when: A new protocol can be created in the UI and executed by voice.
@@ -81,6 +81,7 @@ Each feature includes a small MVP definition so we can scope future work.
 ### 9) Offline voice fallback
 - Value: Basic use when network is down.
 - MVP: Use local STT (Vosk) and local TTS (pyttsx3) when APIs fail.
+- Status: Done (offline TTS + optional Vosk STT support).
 - Touchpoints: `engine/voice.py`.
 - Risks: Extra model downloads and larger installer size.
 - Done when: Simple commands still work offline.

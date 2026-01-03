@@ -69,6 +69,8 @@ args = [
     '--hidden-import=engine.scheduler',
     '--hidden-import=engine.skills',
     '--hidden-import=pystray',
+    '--hidden-import=pyttsx3',
+    '--hidden-import=vosk',
     '--hidden-import=PIL._tkinter_finder',          # Fix for CTkImage
     '--hidden-import=babel.numbers',                # Common issue with some libs
     '--hidden-import=dotenv',                       # Explicitly import dotenv module
@@ -77,7 +79,9 @@ args = [
     '--collect-all=pygame',                         # Collect all pygame data
     '--collect-all=requests',                       # Collect requests data
     '--collect-all=dotenv',                         # Collect pkg data
-    '--collect-all=pystray'                         # Collect pystray data
+    '--collect-all=pystray',                        # Collect pystray data
+    '--collect-all=pyttsx3',                        # Collect pyttsx3 data
+    '--collect-all=vosk'                            # Collect vosk data
 ]
 
 if venv_site_packages:

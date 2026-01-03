@@ -5,8 +5,10 @@ pygame
 python-dotenv
 psutil
 pyaudio
+pyttsx3
 pillow
 pyinstaller
 requests
 numpy
 pystray
+vosk
