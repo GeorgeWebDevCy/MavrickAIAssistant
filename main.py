@@ -15,6 +15,7 @@ from engine.scheduler import ReminderScheduler
 from engine.voice import VoiceEngine
 from engine.profile import load_profile, save_profile
 from gui.app import MavrickUI
+from gui.tray import TrayController
 
 class MavrickAssistant:
     def __init__(self):
@@ -45,9 +46,20 @@ class MavrickAssistant:
             wake_words=profile_wake_words
         )
         self.ui = MavrickUI()
+        self.ui.set_close_action(self.minimize_to_tray)
+        self.ui.btn_exit.configure(command=self.shutdown)
         self.scheduler = ReminderScheduler(on_trigger=self._handle_reminder)
         MavrickActions.set_scheduler(self.scheduler)
         self.scheduler.start()
+        self.is_muted = False
+        self.tray = TrayController(
+            self.ui._icon_path,
+            on_show=self.show_hud,
+            on_listen=self.start_voice_thread,
+            on_toggle_mute=self.toggle_mute,
+            on_exit=self.shutdown
+        )
+        self.tray.start()
         
         # Override UI commands
         self.ui.btn_listen.configure(command=self.start_voice_thread)
@@ -91,6 +103,57 @@ class MavrickAssistant:
             self.voice.speak(f"Reminder: {message}")
         except Exception:
             pass
+
+    def show_hud(self):
+        try:
+            self.ui.after(0, self.ui.show_from_tray)
+        except Exception:
+            pass
+
+    def minimize_to_tray(self):
+        try:
+            self.ui.hide_to_tray()
+        except Exception:
+            pass
+        if self.tray:
+            self.tray.start()
+
+    def toggle_mute(self):
+        self.is_muted = self.voice.toggle_mute()
+        try:
+            if self.is_muted:
+                self.ui.status_label.configure(text="NETWORK STATUS: MUTED", text_color=self.ui.alert_red)
+            else:
+                self.ui.status_label.configure(text="NETWORK STATUS: STANDBY (AWARE)", text_color=self.ui.secondary_teal)
+        except Exception:
+            pass
+        if self.tray:
+            self.tray.set_muted(self.is_muted)
+        return self.is_muted
+
+    def shutdown(self):
+        try:
+            if self.scheduler:
+                self.scheduler.stop()
+        except Exception:
+            pass
+        try:
+            if self.voice:
+                self.voice.stop_background_listening()
+        except Exception:
+            pass
+        try:
+            if self.tray:
+                self.tray.stop()
+        except Exception:
+            pass
+        try:
+            self.ui.after(0, self.ui.destroy)
+        except Exception:
+            try:
+                self.ui.destroy()
+            except Exception:
+                pass
 
     def on_wake_word(self):
         self.log_debug(f"on_wake_word triggered. Current State - is_running: {self.is_running}")

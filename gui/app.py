@@ -53,6 +53,7 @@ class MavrickUI(ctk.CTk):
         self._reminders_window = None
         self._reminders_text = None
         self._reminder_id_entry = None
+        self._close_callback = self.destroy
         self._protocols_cache = {}
         self._protocol_var = None
         self._protocol_menu = None
@@ -77,7 +78,7 @@ class MavrickUI(ctk.CTk):
                                        fg_color="transparent", hover_color="#ff4b2b",
                                        text_color=self.primary_cyan,
                                        font=("Arial", 14),
-                                       command=self.destroy)
+                                       command=self._handle_close)
         self.btn_close.place(relx=0.92, rely=0.01)
         
 
@@ -539,6 +540,27 @@ class MavrickUI(ctk.CTk):
             return
         MavrickActions.clear_reminders()
         self._load_reminders()
+
+    def set_close_action(self, callback):
+        self._close_callback = callback or self.destroy
+
+    def _handle_close(self):
+        if self._close_callback:
+            self._close_callback()
+
+    def hide_to_tray(self):
+        try:
+            self.withdraw()
+        except Exception:
+            pass
+
+    def show_from_tray(self):
+        try:
+            self.deiconify()
+            self.attributes("-topmost", True)
+            self._apply_window_icon()
+        except Exception:
+            pass
 
     def _format_rate(self, bytes_per_sec):
         try:

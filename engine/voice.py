@@ -25,6 +25,7 @@ class VoiceEngine:
         self.total_chars = 0
         self.total_cost = 0.0
         self.debug_mode = os.getenv("DEBUG_MODE", "False") == "True"
+        self.muted = False
         self.wake_words = self._normalize_wake_words(wake_words)
 
         self.recognizer = sr.Recognizer()
@@ -74,12 +75,25 @@ class VoiceEngine:
         self.log_debug(f"Voice persona shifted to: {persona} (OpenAI: {self.voice})")
         return f"Personality matrix updated to {persona.upper()}."
 
+    def set_muted(self, muted):
+        self.muted = bool(muted)
+        state = "MUTED" if self.muted else "UNMUTED"
+        self.log_debug(f"Voice output {state}.")
+        return self.muted
+
+    def toggle_mute(self):
+        return self.set_muted(not self.muted)
+
     def play_ui_sound(self, name):
+        if self.muted:
+            return
         if name in self.ui_sounds:
             self.ui_sounds[name].play()
 
     def speak(self, text):
         print(f"Mavrick: {text}")
+        if self.muted:
+            return
         self.total_chars += len(text)
         # OpenAI TTS costs $0.015 per 1,000 characters
         self.total_cost += (len(text) / 1000) * 0.015

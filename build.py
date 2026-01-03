@@ -68,6 +68,7 @@ args = [
     '--hidden-import=engine.profile',
     '--hidden-import=engine.scheduler',
     '--hidden-import=engine.skills',
+    '--hidden-import=pystray',
     '--hidden-import=PIL._tkinter_finder',          # Fix for CTkImage
     '--hidden-import=babel.numbers',                # Common issue with some libs
     '--hidden-import=dotenv',                       # Explicitly import dotenv module
@@ -75,7 +76,8 @@ args = [
     '--collect-all=speech_recognition',             # Collect all SR data
     '--collect-all=pygame',                         # Collect all pygame data
     '--collect-all=requests',                       # Collect requests data
-    '--collect-all=dotenv'                          # Collect pkg data
+    '--collect-all=dotenv',                         # Collect pkg data
+    '--collect-all=pystray'                         # Collect pystray data
 ]
 
 if venv_site_packages:
