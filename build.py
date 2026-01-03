@@ -72,6 +72,7 @@ args = [
     '--hidden-import=engine.command_history',
     '--hidden-import=engine.session_log',
     '--hidden-import=pystray',
+    '--hidden-import=pystray._win32',
     '--hidden-import=pyttsx3',
     '--hidden-import=vosk',
     '--hidden-import=pytesseract',
