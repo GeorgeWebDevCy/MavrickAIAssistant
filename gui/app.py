@@ -10,6 +10,7 @@ import psutil
 import numpy as np
 import pyaudio
 from engine.actions import MavrickActions
+from engine import session_log
 from engine.weather import WeatherEngine
 from ctypes import windll, c_int, byref, sizeof
 import ctypes
@@ -53,6 +54,8 @@ class MavrickUI(ctk.CTk):
         self._reminders_window = None
         self._reminders_text = None
         self._reminder_id_entry = None
+        self._session_log_window = None
+        self._session_log_text = None
         self._close_callback = self.destroy
         self._settings_window = None
         self._settings_name_entry = None
@@ -237,6 +240,9 @@ class MavrickUI(ctk.CTk):
 
         self.btn_actions = ctk.CTkButton(self, text="ACTIONS LOG", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_action_log)
         self.btn_actions.pack(pady=5, padx=40, fill="x")
+
+        self.btn_session_log = ctk.CTkButton(self, text="SESSION LOG", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_session_log)
+        self.btn_session_log.pack(pady=5, padx=40, fill="x")
 
         self.btn_reminders = ctk.CTkButton(self, text="REMINDERS", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_reminders)
         self.btn_reminders.pack(pady=5, padx=40, fill="x")
@@ -471,6 +477,77 @@ class MavrickUI(ctk.CTk):
         MavrickActions.clear_action_log()
         self._load_action_log()
 
+    def open_session_log(self):
+        if self._session_log_window and self._session_log_window.winfo_exists():
+            self._session_log_window.focus()
+            return
+
+        self._session_log_window = ctk.CTkToplevel(self)
+        self._session_log_window.title("Session Log")
+        self._session_log_window.geometry("620x380")
+        self._session_log_window.resizable(False, False)
+        try:
+            self._session_log_window.iconbitmap(self._icon_path)
+        except Exception:
+            pass
+
+        title = ctk.CTkLabel(self._session_log_window, text="SESSION LOG", font=("Orbitron", 16, "bold"), text_color=self.primary_cyan)
+        title.pack(pady=(10, 6))
+
+        self._session_log_text = ctk.CTkTextbox(self._session_log_window, height=220)
+        self._session_log_text.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+
+        btn_frame = ctk.CTkFrame(self._session_log_window, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=12, pady=(0, 10))
+
+        refresh_btn = ctk.CTkButton(btn_frame, text="Refresh", width=90, command=self._load_session_log)
+        refresh_btn.pack(side="left")
+
+        open_btn = ctk.CTkButton(btn_frame, text="Open File", width=90, command=self._open_session_log_file)
+        open_btn.pack(side="left", padx=8)
+
+        clear_btn = ctk.CTkButton(btn_frame, text="Clear", width=90, fg_color=self.alert_red, hover_color="#c23b24", command=self._clear_session_log)
+        clear_btn.pack(side="left")
+
+        close_btn = ctk.CTkButton(btn_frame, text="Close", width=90, command=self._session_log_window.destroy)
+        close_btn.pack(side="right")
+
+        self._load_session_log()
+
+    def _load_session_log(self):
+        if not self._session_log_text:
+            return
+        entries = session_log.read_entries(limit=250)
+        lines = []
+        for entry in entries:
+            timestamp = entry.get("timestamp", "")
+            kind = entry.get("kind", "")
+            message = entry.get("message", "")
+            lines.append(f"{timestamp} | {kind} | {message}")
+        if not lines:
+            lines.append("No session log entries yet.")
+
+        self._session_log_text.configure(state="normal")
+        self._session_log_text.delete("1.0", "end")
+        self._session_log_text.insert("end", "\n".join(lines))
+        self._session_log_text.configure(state="disabled")
+
+    def _clear_session_log(self):
+        if not messagebox.askyesno("Clear Log", "Clear the session log?"):
+            return
+        session_log.clear_entries()
+        self._load_session_log()
+
+    def _open_session_log_file(self):
+        path = session_log.get_log_path()
+        if not os.path.exists(path):
+            messagebox.showinfo("Session Log", "No session log file yet.")
+            return
+        try:
+            os.startfile(path)
+        except Exception:
+            messagebox.showwarning("Session Log", f"Could not open log file:\n{path}")
+
     def open_reminders(self):
         if self._reminders_window and self._reminders_window.winfo_exists():
             self._reminders_window.focus()
@@ -702,6 +779,7 @@ class MavrickUI(ctk.CTk):
         return f"{rate / 1024:.1f}KB/s"
         
     def log_message(self, message):
+        session_log.append_entry(message, kind="hud")
         self.log_box.insert("end", f"{message}\n")
         self.log_box.see("end")
 

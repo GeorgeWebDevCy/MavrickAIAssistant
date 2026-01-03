@@ -49,6 +49,12 @@ Each feature includes a small MVP definition so we can scope future work.
 - Status: Done (settings UI + profile updates wired).
 - Touchpoints: `gui/app.py`, `main.py`, `engine/voice.py`, `engine/profile.py`.
 
+### 11) Session log viewer + export
+- Value: Keep a persistent transcript for debugging or review.
+- MVP: Append HUD log messages to a file and provide a viewer to open/clear it.
+- Status: Done (session log file + viewer window).
+- Touchpoints: `gui/app.py`, new `engine/session_log.py`.
+
 ## Mid-term (1-3 months)
 
 ### 5) Scheduler and reminders
