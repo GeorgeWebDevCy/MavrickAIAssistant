@@ -43,6 +43,12 @@ Each feature includes a small MVP definition so we can scope future work.
 - Risks: Too many confirmations can hurt UX.
 - Done when: Risky actions require confirmation and are visible in a history list.
 
+### 10) Settings panel + profile editor
+- Value: In-app control over name, persona, voice, and wake words.
+- MVP: A settings window that edits profile values and persists them.
+- Status: Done (settings UI + profile updates wired).
+- Touchpoints: `gui/app.py`, `main.py`, `engine/voice.py`, `engine/profile.py`.
+
 ## Mid-term (1-3 months)
 
 ### 5) Scheduler and reminders

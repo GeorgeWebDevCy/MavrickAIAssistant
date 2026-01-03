@@ -117,6 +117,20 @@ class VoiceEngine:
         self.log_debug(f"Voice persona shifted to: {persona} (OpenAI: {self.voice})")
         return f"Personality matrix updated to {persona.upper()}."
 
+    def set_voice(self, voice):
+        voice = str(voice).strip().lower()
+        if not voice:
+            self.voice = self._voice_for_persona(self.persona)
+        else:
+            self.voice = voice
+        self.log_debug(f"Voice override set to: {self.voice}")
+        return self.voice
+
+    def set_wake_words(self, wake_words):
+        self.wake_words = self._normalize_wake_words(wake_words)
+        self.log_debug(f"Wake words updated: {self.wake_words}")
+        return self.wake_words
+
     def set_muted(self, muted):
         self.muted = bool(muted)
         state = "MUTED" if self.muted else "UNMUTED"

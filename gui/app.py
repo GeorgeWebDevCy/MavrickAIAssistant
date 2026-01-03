@@ -54,6 +54,14 @@ class MavrickUI(ctk.CTk):
         self._reminders_text = None
         self._reminder_id_entry = None
         self._close_callback = self.destroy
+        self._settings_window = None
+        self._settings_name_entry = None
+        self._settings_persona_var = None
+        self._settings_voice_var = None
+        self._settings_wake_text = None
+        self._settings_summary_text = None
+        self._profile_loader = None
+        self._profile_saver = None
         self._protocols_cache = {}
         self._protocol_var = None
         self._protocol_menu = None
@@ -232,6 +240,9 @@ class MavrickUI(ctk.CTk):
 
         self.btn_reminders = ctk.CTkButton(self, text="REMINDERS", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_reminders)
         self.btn_reminders.pack(pady=5, padx=40, fill="x")
+
+        self.btn_settings = ctk.CTkButton(self, text="SETTINGS", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_settings)
+        self.btn_settings.pack(pady=5, padx=40, fill="x")
 
         self.btn_exit = ctk.CTkButton(self, text="TERMINATE CONNECTION", font=("Consolas", 10), fg_color="transparent", border_width=1, border_color=self.alert_red, text_color=self.alert_red, command=self.destroy)
         self.btn_exit.pack(pady=5)
@@ -540,6 +551,125 @@ class MavrickUI(ctk.CTk):
             return
         MavrickActions.clear_reminders()
         self._load_reminders()
+
+    def set_profile_callbacks(self, load_callback, save_callback):
+        self._profile_loader = load_callback
+        self._profile_saver = save_callback
+
+    def _voice_for_persona(self, persona):
+        voices = {
+            "mavrick": "onyx",
+            "jarvis": "fable",
+            "friday": "shimmer"
+        }
+        return voices.get(str(persona).lower(), "onyx")
+
+    def open_settings(self):
+        if self._settings_window and self._settings_window.winfo_exists():
+            self._settings_window.focus()
+            return
+
+        self._settings_window = ctk.CTkToplevel(self)
+        self._settings_window.title("Settings")
+        self._settings_window.geometry("560x420")
+        self._settings_window.resizable(False, False)
+        try:
+            self._settings_window.iconbitmap(self._icon_path)
+        except Exception:
+            pass
+
+        profile = {}
+        if self._profile_loader:
+            try:
+                profile = self._profile_loader()
+            except Exception:
+                profile = {}
+
+        user_name = profile.get("user_name", "")
+        persona = profile.get("persona", "mavrick")
+        voice = profile.get("voice", "")
+        wake_words = profile.get("wake_words", [])
+        summary = profile.get("summary", "")
+
+        title = ctk.CTkLabel(self._settings_window, text="SETTINGS", font=("Orbitron", 16, "bold"), text_color=self.primary_cyan)
+        title.pack(pady=(10, 6))
+
+        form = ctk.CTkFrame(self._settings_window, fg_color="transparent")
+        form.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+
+        name_label = ctk.CTkLabel(form, text="User Name", font=("Consolas", 10), text_color=self.secondary_teal)
+        name_label.pack(anchor="w")
+        self._settings_name_entry = ctk.CTkEntry(form, width=300)
+        self._settings_name_entry.pack(fill="x", pady=(0, 6))
+        self._settings_name_entry.insert(0, user_name)
+
+        persona_label = ctk.CTkLabel(form, text="Persona", font=("Consolas", 10), text_color=self.secondary_teal)
+        persona_label.pack(anchor="w")
+        persona_values = ["mavrick", "jarvis", "friday"]
+        self._settings_persona_var = tk.StringVar(value=persona if persona in persona_values else "mavrick")
+        persona_menu = ctk.CTkOptionMenu(form, values=persona_values, variable=self._settings_persona_var)
+        persona_menu.pack(fill="x", pady=(0, 6))
+
+        voice_label = ctk.CTkLabel(form, text="Voice (auto uses persona)", font=("Consolas", 10), text_color=self.secondary_teal)
+        voice_label.pack(anchor="w")
+        voice_values = ["auto", "alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+        voice_choice = voice or "auto"
+        if voice_choice == self._voice_for_persona(persona):
+            voice_choice = "auto"
+        self._settings_voice_var = tk.StringVar(value=voice_choice if voice_choice in voice_values else "auto")
+        voice_menu = ctk.CTkOptionMenu(form, values=voice_values, variable=self._settings_voice_var)
+        voice_menu.pack(fill="x", pady=(0, 6))
+
+        wake_label = ctk.CTkLabel(form, text="Wake Words (one per line)", font=("Consolas", 10), text_color=self.secondary_teal)
+        wake_label.pack(anchor="w")
+        self._settings_wake_text = ctk.CTkTextbox(form, height=80)
+        self._settings_wake_text.pack(fill="both", pady=(0, 6))
+        if isinstance(wake_words, list):
+            self._settings_wake_text.insert("end", "\n".join(wake_words))
+
+        summary_label = ctk.CTkLabel(form, text="Memory Summary (read-only)", font=("Consolas", 10), text_color=self.secondary_teal)
+        summary_label.pack(anchor="w")
+        self._settings_summary_text = ctk.CTkTextbox(form, height=60)
+        self._settings_summary_text.pack(fill="both", pady=(0, 6))
+        self._settings_summary_text.insert("end", summary or "No summary yet.")
+        self._settings_summary_text.configure(state="disabled")
+
+        btn_frame = ctk.CTkFrame(self._settings_window, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=12, pady=(0, 10))
+
+        save_btn = ctk.CTkButton(btn_frame, text="Save", width=90, command=self._save_settings)
+        save_btn.pack(side="left")
+
+        close_btn = ctk.CTkButton(btn_frame, text="Close", width=90, command=self._settings_window.destroy)
+        close_btn.pack(side="right")
+
+    def _save_settings(self):
+        if not self._profile_saver:
+            messagebox.showwarning("Settings", "Profile update is unavailable.")
+            return
+
+        user_name = self._settings_name_entry.get().strip() if self._settings_name_entry else ""
+        persona = self._settings_persona_var.get() if self._settings_persona_var else "mavrick"
+        voice = self._settings_voice_var.get() if self._settings_voice_var else "auto"
+
+        wake_text = ""
+        if self._settings_wake_text:
+            wake_text = self._settings_wake_text.get("1.0", "end")
+        wake_words = []
+        for token in wake_text.replace(",", "\n").splitlines():
+            token = token.strip()
+            if token:
+                wake_words.append(token)
+
+        updates = {
+            "user_name": user_name,
+            "persona": persona,
+            "voice": voice,
+            "wake_words": wake_words
+        }
+
+        result = self._profile_saver(updates)
+        messagebox.showinfo("Settings", result)
 
     def set_close_action(self, callback):
         self._close_callback = callback or self.destroy

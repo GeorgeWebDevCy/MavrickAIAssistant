@@ -46,6 +46,7 @@ class MavrickAssistant:
             wake_words=profile_wake_words
         )
         self.ui = MavrickUI()
+        self.ui.set_profile_callbacks(self.get_profile_snapshot, self.apply_profile_update)
         self.ui.set_close_action(self.minimize_to_tray)
         self.ui.btn_exit.configure(command=self.shutdown)
         self.scheduler = ReminderScheduler(on_trigger=self._handle_reminder)
@@ -77,6 +78,45 @@ class MavrickAssistant:
     def log_debug(self, msg):
         if self.debug_mode:
             print(f" [DEBUG] [MAIN]: {msg}")
+
+    def get_profile_snapshot(self):
+        return dict(self.profile)
+
+    def apply_profile_update(self, updates):
+        if not isinstance(updates, dict):
+            return "Invalid profile update."
+
+        if "user_name" in updates and updates["user_name"]:
+            user_name = str(updates["user_name"]).strip()
+            if user_name:
+                self.profile["user_name"] = user_name
+                self.brain.user_name = user_name
+                self.voice.user_name = user_name
+
+        persona = updates.get("persona")
+        voice_override = updates.get("voice")
+        if persona:
+            persona = str(persona).strip().lower()
+            if persona:
+                self.profile["persona"] = persona
+                self.voice.set_persona(persona)
+                if voice_override is None:
+                    self.voice.set_voice(self.voice._voice_for_persona(persona))
+                    self.profile["voice"] = self.voice.voice
+
+        if voice_override is not None:
+            voice_override = str(voice_override).strip().lower()
+            if voice_override == "auto":
+                voice_override = ""
+            self.voice.set_voice(voice_override)
+            self.profile["voice"] = self.voice.voice
+
+        if "wake_words" in updates and updates["wake_words"] is not None:
+            self.voice.set_wake_words(updates["wake_words"])
+            self.profile["wake_words"] = self.voice.wake_words
+
+        self._persist_profile()
+        return "Profile updated."
 
     def _persist_profile(self):
         self.profile = save_profile(self.profile)
