@@ -677,7 +677,7 @@ class MavrickUI(ctk.CTk):
         voices = {
             "mavrick": "onyx",
             "jarvis": "fable",
-            "friday": "shimmer"
+            "friday": "nova"
         }
         return voices.get(str(persona).lower(), "onyx")
 

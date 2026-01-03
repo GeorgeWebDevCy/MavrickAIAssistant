@@ -99,7 +99,7 @@ class VoiceEngine:
         voices = {
             "mavrick": "onyx",
             "jarvis": "fable",
-            "friday": "shimmer"
+            "friday": "nova"
         }
         return voices.get(persona.lower(), "onyx")
 
