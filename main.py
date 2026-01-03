@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from engine.brain import MavrickBrain
 from engine.actions import MavrickActions
+from engine import command_history
 from engine.scheduler import ReminderScheduler
 from engine.voice import VoiceEngine
 from engine.profile import load_profile, save_profile
@@ -240,15 +241,16 @@ class MavrickAssistant:
             self.continuous_mode = False
             self.should_stop_listening = False
             self.ui.status_label.configure(text="NETWORK STATUS: THINKING", text_color="#fdfd96")
-            self._handle_query(query)
+            self._handle_query(query, source="text")
         except Exception as e:
             self.log_debug(f"CRITICAL ERROR in text command: {e}")
             self.ui.log_message(f"> SYSTEM ERROR: {str(e)[:50]}")
         finally:
             self._finalize_command()
 
-    def _handle_query(self, query):
+    def _handle_query(self, query, source="voice"):
         if query != "None" and query != "":
+            command_history.append_entry(query, source=source)
             # Check for termination phrases
             termination_phrases = ["stop listening", "go to sleep", "terminate session", "thank you mavrick", "that's all"]
             if any(phrase in query.lower() for phrase in termination_phrases):
@@ -323,7 +325,7 @@ class MavrickAssistant:
             # Listen
             query = self.voice.listen()
             self.log_debug(f"Raw query captured: '{query}'")
-            self._handle_query(query)
+            self._handle_query(query, source="voice")
         except Exception as e:
             self.log_debug(f"CRITICAL ERROR in process_command: {e}")
             if "context_length_exceeded" in str(e).lower() or "BadRequestError" in str(type(e).__name__):

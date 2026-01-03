@@ -11,6 +11,7 @@ import numpy as np
 import pyaudio
 from engine.actions import MavrickActions
 from engine import session_log
+from engine import command_history
 from engine.weather import WeatherEngine
 from ctypes import windll, c_int, byref, sizeof
 import ctypes
@@ -68,6 +69,11 @@ class MavrickUI(ctk.CTk):
         self._text_command_callback = None
         self._command_entry = None
         self._command_send_btn = None
+        self._command_history_window = None
+        self._command_history_text = None
+        self._command_history = []
+        self._command_history_index = 0
+        self._command_history_loaded = False
         self._protocols_cache = {}
         self._protocol_var = None
         self._protocol_menu = None
@@ -241,6 +247,8 @@ class MavrickUI(ctk.CTk):
         self._command_entry = ctk.CTkEntry(self.command_frame, placeholder_text="TYPE COMMAND...", height=32)
         self._command_entry.pack(side="left", fill="x", expand=True)
         self._command_entry.bind("<Return>", self._send_text_command)
+        self._command_entry.bind("<Up>", self._history_prev)
+        self._command_entry.bind("<Down>", self._history_next)
 
         self._command_send_btn = ctk.CTkButton(self.command_frame, text="SEND", width=70, height=32, command=self._send_text_command)
         self._command_send_btn.pack(side="left", padx=(8, 0))
@@ -256,6 +264,9 @@ class MavrickUI(ctk.CTk):
 
         self.btn_session_log = ctk.CTkButton(self, text="SESSION LOG", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_session_log)
         self.btn_session_log.pack(pady=5, padx=40, fill="x")
+
+        self.btn_command_history = ctk.CTkButton(self, text="COMMAND HISTORY", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_command_history)
+        self.btn_command_history.pack(pady=5, padx=40, fill="x")
 
         self.btn_reminders = ctk.CTkButton(self, text="REMINDERS", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_reminders)
         self.btn_reminders.pack(pady=5, padx=40, fill="x")
@@ -771,7 +782,150 @@ class MavrickUI(ctk.CTk):
         if not text:
             return
         self._command_entry.delete(0, "end")
+        self._remember_command(text)
         self._text_command_callback(text)
+
+    def _remember_command(self, text):
+        if self._command_history and self._command_history[-1] == text:
+            self._command_history_index = len(self._command_history)
+            return
+        self._command_history.append(text)
+        if len(self._command_history) > 200:
+            self._command_history = self._command_history[-200:]
+        self._command_history_index = len(self._command_history)
+        self._command_history_loaded = True
+
+    def _refresh_command_history_cache(self, force=False):
+        if self._command_history_loaded and not force:
+            return
+        entries = command_history.read_entries(limit=200, source="text")
+        self._command_history = [entry.get("text", "") for entry in entries if entry.get("text")]
+        self._command_history_index = len(self._command_history)
+        self._command_history_loaded = True
+
+    def _history_prev(self, event=None):
+        if not self._command_entry:
+            return "break"
+        self._refresh_command_history_cache()
+        if not self._command_history:
+            return "break"
+        if self._command_history_index > 0:
+            self._command_history_index -= 1
+        text = self._command_history[self._command_history_index]
+        self._command_entry.delete(0, "end")
+        self._command_entry.insert(0, text)
+        self._command_entry.icursor("end")
+        return "break"
+
+    def _history_next(self, event=None):
+        if not self._command_entry:
+            return "break"
+        self._refresh_command_history_cache()
+        if not self._command_history:
+            return "break"
+        if self._command_history_index < len(self._command_history) - 1:
+            self._command_history_index += 1
+            text = self._command_history[self._command_history_index]
+        else:
+            self._command_history_index = len(self._command_history)
+            text = ""
+        self._command_entry.delete(0, "end")
+        if text:
+            self._command_entry.insert(0, text)
+            self._command_entry.icursor("end")
+        return "break"
+
+    def open_command_history(self):
+        if self._command_history_window and self._command_history_window.winfo_exists():
+            self._command_history_window.focus()
+            return
+
+        self._command_history_window = ctk.CTkToplevel(self)
+        self._command_history_window.title("Command History")
+        self._command_history_window.geometry("620x380")
+        self._command_history_window.resizable(False, False)
+        try:
+            self._command_history_window.iconbitmap(self._icon_path)
+        except Exception:
+            pass
+
+        title = ctk.CTkLabel(self._command_history_window, text="COMMAND HISTORY", font=("Orbitron", 16, "bold"), text_color=self.primary_cyan)
+        title.pack(pady=(10, 6))
+
+        self._command_history_text = ctk.CTkTextbox(self._command_history_window, height=220)
+        self._command_history_text.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+
+        btn_frame = ctk.CTkFrame(self._command_history_window, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=12, pady=(0, 10))
+
+        refresh_btn = ctk.CTkButton(btn_frame, text="Refresh", width=90, command=self._load_command_history)
+        refresh_btn.pack(side="left")
+
+        use_btn = ctk.CTkButton(btn_frame, text="Use Last", width=90, command=self._use_last_command)
+        use_btn.pack(side="left", padx=8)
+
+        open_btn = ctk.CTkButton(btn_frame, text="Open File", width=90, command=self._open_command_history_file)
+        open_btn.pack(side="left")
+
+        clear_btn = ctk.CTkButton(btn_frame, text="Clear", width=90, fg_color=self.alert_red, hover_color="#c23b24", command=self._clear_command_history)
+        clear_btn.pack(side="left", padx=8)
+
+        close_btn = ctk.CTkButton(btn_frame, text="Close", width=90, command=self._command_history_window.destroy)
+        close_btn.pack(side="right")
+
+        self._load_command_history()
+
+    def _load_command_history(self):
+        if not self._command_history_text:
+            return
+        entries = command_history.read_entries(limit=250)
+        lines = []
+        for entry in entries:
+            timestamp = entry.get("timestamp", "")
+            source = entry.get("source", "")
+            text = entry.get("text", "")
+            lines.append(f"{timestamp} | {source} | {text}")
+        if not lines:
+            lines.append("No commands logged yet.")
+
+        self._command_history_text.configure(state="normal")
+        self._command_history_text.delete("1.0", "end")
+        self._command_history_text.insert("end", "\n".join(lines))
+        self._command_history_text.configure(state="disabled")
+
+        self._command_history_loaded = False
+        self._refresh_command_history_cache(force=True)
+
+    def _use_last_command(self):
+        self._refresh_command_history_cache()
+        if not self._command_entry:
+            return
+        if not self._command_history:
+            messagebox.showinfo("Command History", "No recent commands.")
+            return
+        text = self._command_history[-1]
+        self._command_entry.delete(0, "end")
+        self._command_entry.insert(0, text)
+        self._command_entry.icursor("end")
+
+    def _clear_command_history(self):
+        if not messagebox.askyesno("Clear History", "Clear command history?"):
+            return
+        command_history.clear_entries()
+        self._command_history = []
+        self._command_history_index = 0
+        self._command_history_loaded = False
+        self._load_command_history()
+
+    def _open_command_history_file(self):
+        path = command_history.get_history_path()
+        if not os.path.exists(path):
+            messagebox.showinfo("Command History", "No command history file yet.")
+            return
+        try:
+            os.startfile(path)
+        except Exception:
+            messagebox.showwarning("Command History", f"Could not open history file:\n{path}")
 
     def set_close_action(self, callback):
         self._close_callback = callback or self.destroy

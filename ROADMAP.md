@@ -61,6 +61,12 @@ Each feature includes a small MVP definition so we can scope future work.
 - Status: Done (command entry + shared command pipeline).
 - Touchpoints: `gui/app.py`, `main.py`.
 
+### 13) Command history recall
+- Value: Reuse recent commands with keyboard navigation and a history viewer.
+- MVP: Up/Down history navigation and a log viewer for commands.
+- Status: Done (history file + Up/Down recall + viewer).
+- Touchpoints: `gui/app.py`, `main.py`, new `engine/command_history.py`.
+
 ## Mid-term (1-3 months)
 
 ### 5) Scheduler and reminders
