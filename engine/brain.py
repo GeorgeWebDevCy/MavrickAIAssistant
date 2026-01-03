@@ -36,6 +36,35 @@ class MavrickBrain:
         if self.debug_mode:
             print(f" [DEBUG] [BRAIN]: {msg}")
 
+    def _normalize_message(self, message):
+        if isinstance(message, dict):
+            return message
+        if hasattr(message, "model_dump"):
+            try:
+                return message.model_dump(exclude_none=True)
+            except TypeError:
+                return message.model_dump()
+        if hasattr(message, "to_dict"):
+            try:
+                return message.to_dict()
+            except Exception:
+                pass
+        if hasattr(message, "dict"):
+            try:
+                return message.dict(exclude_none=True)
+            except TypeError:
+                return message.dict()
+        data = {}
+        for key in ("role", "content", "tool_calls", "name", "tool_call_id"):
+            if hasattr(message, key):
+                data[key] = getattr(message, key)
+        return data if data else {"role": "assistant", "content": str(message)}
+
+    def _message_get(self, message, key, default=None):
+        if isinstance(message, dict):
+            return message.get(key, default)
+        return getattr(message, key, default)
+
     def _build_tools(self):
         tools = [
             {
@@ -270,7 +299,7 @@ class MavrickBrain:
             if msg.tool_calls:
                 self.log_debug(f"Logic sequence triggered. {len(msg.tool_calls)} tool calls requested.")
                 # Add the assistant message with tool calls to memory ONCE
-                self.memory.append(msg)
+                self.memory.append(self._normalize_message(msg))
                 
                 for tool_call in msg.tool_calls:
                     func_name = tool_call.function.name
@@ -377,7 +406,7 @@ class MavrickBrain:
                 # Search forward from start_index to find the first 'user' message
                 new_start = -1
                 for i in range(start_index, len(self.memory)):
-                    if self.memory[i].get("role") == "user":
+                    if self._message_get(self.memory[i], "role") == "user":
                         new_start = i
                         break
                 
@@ -400,8 +429,8 @@ class MavrickBrain:
         def _clean(text):
             return " ".join(str(text).split())
 
-        recent_users = [_clean(m.get("content", "")) for m in self.memory if m.get("role") == "user"][-3:]
-        recent_assistant = [_clean(m.get("content", "")) for m in self.memory if m.get("role") == "assistant"][-2:]
+        recent_users = [_clean(self._message_get(m, "content", "")) for m in self.memory if self._message_get(m, "role") == "user"][-3:]
+        recent_assistant = [_clean(self._message_get(m, "content", "")) for m in self.memory if self._message_get(m, "role") == "assistant"][-2:]
         parts = []
         if recent_users:
             parts.append("Recent user requests: " + " | ".join(recent_users))
