@@ -73,6 +73,12 @@ Each feature includes a small MVP definition so we can scope future work.
 - Status: Done (notes storage + HUD notes manager + voice tools).
 - Touchpoints: `engine/notes.py`, `engine/actions.py`, `engine/brain.py`, `gui/app.py`.
 
+### 15) Keyboard shortcuts + shortcuts guide
+- Value: Faster navigation and quick shortcut discovery.
+- MVP: Global keyboard shortcuts for core HUD actions plus a shortcuts window (F1/Ctrl+/).
+- Status: Done (global binds + shortcuts window + HUD button).
+- Touchpoints: `gui/app.py`.
+
 ## Mid-term (1-3 months)
 
 ### 5) Scheduler and reminders

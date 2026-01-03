@@ -79,6 +79,9 @@ class MavrickUI(ctk.CTk):
         self._notes_text = None
         self._note_input = None
         self._note_id_entry = None
+        self._shortcuts_window = None
+        self._shortcuts_text = None
+        self._shortcuts = []
         self._protocols_cache = {}
         self._protocol_var = None
         self._protocol_menu = None
@@ -158,6 +161,7 @@ class MavrickUI(ctk.CTk):
             self.audio_running = False
 
         self.setup_ui()
+        self._bind_shortcuts()
         self.start_monitor_thread()
         self.start_weather_thread()
         self.animate_hud()
@@ -281,6 +285,9 @@ class MavrickUI(ctk.CTk):
 
         self.btn_settings = ctk.CTkButton(self, text="SETTINGS", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_settings)
         self.btn_settings.pack(pady=5, padx=40, fill="x")
+
+        self.btn_shortcuts = ctk.CTkButton(self, text="SHORTCUTS", font=("Consolas", 10, "bold"), fg_color=self.secondary_teal, text_color="white", hover_color="#0a768f", corner_radius=5, height=34, command=self.open_shortcuts)
+        self.btn_shortcuts.pack(pady=5, padx=40, fill="x")
 
         self.btn_exit = ctk.CTkButton(self, text="TERMINATE CONNECTION", font=("Consolas", 10), fg_color="transparent", border_width=1, border_color=self.alert_red, text_color=self.alert_red, command=self.destroy)
         self.btn_exit.pack(pady=5)
@@ -779,6 +786,147 @@ class MavrickUI(ctk.CTk):
 
         result = self._profile_saver(updates)
         messagebox.showinfo("Settings", result)
+
+    def _bind_shortcuts(self):
+        self._shortcuts = []
+        self._register_shortcut(
+            patterns=["<F1>", "<Control-slash>"],
+            label="F1 / Ctrl+/",
+            description="Show shortcuts",
+            handler=self.open_shortcuts
+        )
+        self._register_shortcut(
+            patterns=["<Control-space>"],
+            label="Ctrl+Space",
+            description="Engage voice listening",
+            handler=self._trigger_listen
+        )
+        self._register_shortcut(
+            patterns=["<Control-l>"],
+            label="Ctrl+L",
+            description="Focus command input",
+            handler=self._focus_command_entry
+        )
+        self._register_shortcut(
+            patterns=["<Control-p>"],
+            label="Ctrl+P",
+            description="Open protocols",
+            handler=self.open_protocol_editor
+        )
+        self._register_shortcut(
+            patterns=["<Control-Shift-a>"],
+            label="Ctrl+Shift+A",
+            description="Open actions log",
+            handler=self.open_action_log
+        )
+        self._register_shortcut(
+            patterns=["<Control-Shift-s>"],
+            label="Ctrl+Shift+S",
+            description="Open session log",
+            handler=self.open_session_log
+        )
+        self._register_shortcut(
+            patterns=["<Control-Shift-h>"],
+            label="Ctrl+Shift+H",
+            description="Open command history",
+            handler=self.open_command_history
+        )
+        self._register_shortcut(
+            patterns=["<Control-Shift-n>"],
+            label="Ctrl+Shift+N",
+            description="Open notes",
+            handler=self.open_notes
+        )
+        self._register_shortcut(
+            patterns=["<Control-Shift-r>"],
+            label="Ctrl+Shift+R",
+            description="Open reminders",
+            handler=self.open_reminders
+        )
+        self._register_shortcut(
+            patterns=["<Control-comma>"],
+            label="Ctrl+,",
+            description="Open settings",
+            handler=self.open_settings
+        )
+        self._register_shortcut(
+            patterns=["<Control-Shift-m>"],
+            label="Ctrl+Shift+M",
+            description="Hide HUD to tray",
+            handler=self._handle_close
+        )
+        self._shortcuts.append(("Up/Down (command entry)", "Cycle command history"))
+        self._shortcuts.append(("Enter (command entry)", "Send typed command"))
+
+    def _register_shortcut(self, patterns, label, description, handler):
+        if label:
+            self._shortcuts.append((label, description))
+        for pattern in patterns:
+            self.bind_all(
+                pattern,
+                lambda event, handler=handler: self._handle_shortcut(handler),
+                add="+"
+            )
+
+    def _handle_shortcut(self, handler):
+        try:
+            handler()
+        except Exception:
+            pass
+        return "break"
+
+    def _trigger_listen(self):
+        try:
+            self.on_engage()
+        except Exception:
+            pass
+
+    def _focus_command_entry(self):
+        if self._command_entry:
+            self._command_entry.focus_set()
+            self._command_entry.icursor("end")
+
+    def open_shortcuts(self):
+        if self._shortcuts_window and self._shortcuts_window.winfo_exists():
+            self._shortcuts_window.focus()
+            return
+
+        self._shortcuts_window = ctk.CTkToplevel(self)
+        self._shortcuts_window.title("Shortcuts")
+        self._shortcuts_window.geometry("520x360")
+        self._shortcuts_window.resizable(False, False)
+        try:
+            self._shortcuts_window.iconbitmap(self._icon_path)
+        except Exception:
+            pass
+
+        title = ctk.CTkLabel(self._shortcuts_window, text="SHORTCUTS", font=("Orbitron", 16, "bold"), text_color=self.primary_cyan)
+        title.pack(pady=(10, 6))
+
+        self._shortcuts_text = ctk.CTkTextbox(self._shortcuts_window, height=220)
+        self._shortcuts_text.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+
+        btn_frame = ctk.CTkFrame(self._shortcuts_window, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=12, pady=(0, 10))
+
+        close_btn = ctk.CTkButton(btn_frame, text="Close", width=90, command=self._shortcuts_window.destroy)
+        close_btn.pack(side="right")
+
+        self._render_shortcuts()
+
+    def _render_shortcuts(self):
+        if not self._shortcuts_text:
+            return
+        lines = []
+        for keys, description in self._shortcuts:
+            lines.append(f"{keys} - {description}")
+        if not lines:
+            lines.append("No shortcuts registered.")
+
+        self._shortcuts_text.configure(state="normal")
+        self._shortcuts_text.delete("1.0", "end")
+        self._shortcuts_text.insert("end", "\n".join(lines))
+        self._shortcuts_text.configure(state="disabled")
 
     def set_text_command_callback(self, callback):
         self._text_command_callback = callback
