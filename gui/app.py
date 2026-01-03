@@ -65,6 +65,9 @@ class MavrickUI(ctk.CTk):
         self._settings_summary_text = None
         self._profile_loader = None
         self._profile_saver = None
+        self._text_command_callback = None
+        self._command_entry = None
+        self._command_send_btn = None
         self._protocols_cache = {}
         self._protocol_var = None
         self._protocol_menu = None
@@ -231,6 +234,16 @@ class MavrickUI(ctk.CTk):
         # Bottom Controls
         self.status_label = ctk.CTkLabel(self, text="NETWORK STATUS: STANDBY", font=("Consolas", 11, "bold"), text_color=self.primary_cyan)
         self.status_label.pack(pady=5)
+
+        self.command_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.command_frame.pack(pady=6, padx=40, fill="x")
+
+        self._command_entry = ctk.CTkEntry(self.command_frame, placeholder_text="TYPE COMMAND...", height=32)
+        self._command_entry.pack(side="left", fill="x", expand=True)
+        self._command_entry.bind("<Return>", self._send_text_command)
+
+        self._command_send_btn = ctk.CTkButton(self.command_frame, text="SEND", width=70, height=32, command=self._send_text_command)
+        self._command_send_btn.pack(side="left", padx=(8, 0))
         
         self.btn_listen = ctk.CTkButton(self, text="ENGAGE HYPERLINK", font=("Orbitron", 12, "bold"), fg_color=self.primary_cyan, text_color="black", hover_color="#00b8e6", corner_radius=5, height=40, command=self.on_engage)
         self.btn_listen.pack(pady=10, padx=40, fill="x")
@@ -747,6 +760,18 @@ class MavrickUI(ctk.CTk):
 
         result = self._profile_saver(updates)
         messagebox.showinfo("Settings", result)
+
+    def set_text_command_callback(self, callback):
+        self._text_command_callback = callback
+
+    def _send_text_command(self, event=None):
+        if not self._text_command_callback or not self._command_entry:
+            return
+        text = self._command_entry.get().strip()
+        if not text:
+            return
+        self._command_entry.delete(0, "end")
+        self._text_command_callback(text)
 
     def set_close_action(self, callback):
         self._close_callback = callback or self.destroy

@@ -55,6 +55,12 @@ Each feature includes a small MVP definition so we can scope future work.
 - Status: Done (session log file + viewer window).
 - Touchpoints: `gui/app.py`, new `engine/session_log.py`.
 
+### 12) Typed command input
+- Value: Allow keyboard-driven command execution without voice.
+- MVP: A command entry field in the HUD that sends text to the brain.
+- Status: Done (command entry + shared command pipeline).
+- Touchpoints: `gui/app.py`, `main.py`.
+
 ## Mid-term (1-3 months)
 
 ### 5) Scheduler and reminders

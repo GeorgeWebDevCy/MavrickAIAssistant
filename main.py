@@ -47,6 +47,7 @@ class MavrickAssistant:
         )
         self.ui = MavrickUI()
         self.ui.set_profile_callbacks(self.get_profile_snapshot, self.apply_profile_update)
+        self.ui.set_text_command_callback(self.start_text_command)
         self.ui.set_close_action(self.minimize_to_tray)
         self.ui.btn_exit.configure(command=self.shutdown)
         self.scheduler = ReminderScheduler(on_trigger=self._handle_reminder)
@@ -223,6 +224,91 @@ class MavrickAssistant:
             thread = threading.Thread(target=self.process_command, daemon=True, args=(False,))
             thread.start()
 
+    def start_text_command(self, text):
+        if self.is_running:
+            self.ui.log_message("> SYSTEM: Busy. Try again.")
+            return
+        query = str(text).strip()
+        if not query:
+            return
+        thread = threading.Thread(target=self._process_text_command, daemon=True, args=(query,))
+        thread.start()
+
+    def _process_text_command(self, query):
+        try:
+            self.is_running = True
+            self.continuous_mode = False
+            self.should_stop_listening = False
+            self.ui.status_label.configure(text="NETWORK STATUS: THINKING", text_color="#fdfd96")
+            self._handle_query(query)
+        except Exception as e:
+            self.log_debug(f"CRITICAL ERROR in text command: {e}")
+            self.ui.log_message(f"> SYSTEM ERROR: {str(e)[:50]}")
+        finally:
+            self._finalize_command()
+
+    def _handle_query(self, query):
+        if query != "None" and query != "":
+            # Check for termination phrases
+            termination_phrases = ["stop listening", "go to sleep", "terminate session", "thank you mavrick", "that's all"]
+            if any(phrase in query.lower() for phrase in termination_phrases):
+                self.log_debug(f"Termination phrase detected in: '{query}'")
+                self.ui.log_message(f"> User: {query}")
+                self.voice.speak("Understood. Returning to standby.")
+                self.continuous_mode = False
+                self.should_stop_listening = True
+                return
+
+            self.ui.status_label.configure(text="NETWORK STATUS: THINKING", text_color="#fdfd96")
+            self.ui.log_message(f"> User: {query}")
+            self.log_debug("Sending query to Neural Engine (Brain)...")
+
+            # UI Sound
+            self.voice.play_ui_sound("think")
+
+            # Brain response
+            response = self.brain.get_response(query)
+            self.log_debug(f"Brain reasoning complete. Response length: {len(response)}")
+
+            # Intercept Special Markers
+            if "SWITCHING_PERSONA_TO_" in response:
+                new_persona = response.replace("SWITCHING_PERSONA_TO_", "").strip().lower()
+                self.log_debug(f"Persona shift requested: {new_persona}")
+                self.voice.set_persona(new_persona)
+                self.profile["persona"] = new_persona
+                self.profile["voice"] = self.voice.voice
+                self._persist_profile()
+                # Clean up response text for user
+                response = f"Personality matrix successfully shifted to {new_persona.upper()}."
+                self.ui.log_message(f"> SYSTEM: Persona switched to {new_persona.upper()}")
+
+            self.ui.log_box.insert("end", f"\n> Mavrick: {response}")
+            self.ui.log_box.see("end")
+            self.ui.status_label.configure(text="NETWORK STATUS: SPEAKING", text_color="#00ff00")
+
+            # Speak
+            self.voice.speak(response)
+
+            # Update HUD Stats
+            self.ui.update_stats(self.brain.session_cost, self.brain.total_tokens, self.brain.current_balance)
+            self._update_profile_summary()
+        else:
+            self.log_debug("No audible input or confidence too low.")
+            self.ui.status_label.configure(text="NETWORK STATUS: STANDBY", text_color=self.ui.primary_cyan)
+            self.ui.log_message("> No input detected.")
+
+    def _finalize_command(self):
+        self.log_debug("Finalizing command lifecycle. Resetting state.")
+        self.is_running = False
+
+        if self.continuous_mode and not self.should_stop_listening:
+            self.log_debug("Continuous loop: Re-engaging listener.")
+            time.sleep(0.5) # Short breathing room
+            self.start_voice_thread()
+        else:
+            self.log_debug("Exiting continuous mode. Returning to Standby (Aware).")
+            self.ui.status_label.configure(text="NETWORK STATUS: STANDBY (AWARE)", text_color=self.ui.secondary_teal)
+
     def process_command(self, was_woken=False):
         try:
             self.is_running = True
@@ -237,55 +323,7 @@ class MavrickAssistant:
             # Listen
             query = self.voice.listen()
             self.log_debug(f"Raw query captured: '{query}'")
-            
-            if query != "None" and query != "":
-                # Check for termination phrases
-                termination_phrases = ["stop listening", "go to sleep", "terminate session", "thank you mavrick", "that's all"]
-                if any(phrase in query.lower() for phrase in termination_phrases):
-                    self.log_debug(f"Termination phrase detected in: '{query}'")
-                    self.ui.log_message(f"> User: {query}")
-                    self.voice.speak("Understood. Returning to standby.")
-                    self.continuous_mode = False
-                    self.should_stop_listening = True
-                    return
-
-                self.ui.status_label.configure(text="NETWORK STATUS: THINKING", text_color="#fdfd96")
-                self.ui.log_message(f"> User: {query}")
-                self.log_debug("Sending query to Neural Engine (Brain)...")
-                
-                # UI Sound
-                self.voice.play_ui_sound("think")
-                
-                # Brain response
-                response = self.brain.get_response(query)
-                self.log_debug(f"Brain reasoning complete. Response length: {len(response)}")
-                
-                # Intercept Special Markers
-                if "SWITCHING_PERSONA_TO_" in response:
-                    new_persona = response.replace("SWITCHING_PERSONA_TO_", "").strip().lower()
-                    self.log_debug(f"Persona shift requested: {new_persona}")
-                    self.voice.set_persona(new_persona)
-                    self.profile["persona"] = new_persona
-                    self.profile["voice"] = self.voice.voice
-                    self._persist_profile()
-                    # Clean up response text for user
-                    response = f"Personality matrix successfully shifted to {new_persona.upper()}."
-                    self.ui.log_message(f"> SYSTEM: Persona switched to {new_persona.upper()}")
-                
-                self.ui.log_box.insert("end", f"\n> Mavrick: {response}")
-                self.ui.log_box.see("end")
-                self.ui.status_label.configure(text="NETWORK STATUS: SPEAKING", text_color="#00ff00")
-                
-                # Speak
-                self.voice.speak(response)
-                
-                # Update HUD Stats
-                self.ui.update_stats(self.brain.session_cost, self.brain.total_tokens, self.brain.current_balance)
-                self._update_profile_summary()
-            else:
-                self.log_debug("No audible input or confidence too low.")
-                self.ui.status_label.configure(text="NETWORK STATUS: STANDBY", text_color=self.ui.primary_cyan)
-                self.ui.log_message("> No input detected.")
+            self._handle_query(query)
         except Exception as e:
             self.log_debug(f"CRITICAL ERROR in process_command: {e}")
             if "context_length_exceeded" in str(e).lower() or "BadRequestError" in str(type(e).__name__):
@@ -297,17 +335,7 @@ class MavrickAssistant:
             else:
                 self.ui.log_message(f"> SYSTEM ERROR: {str(e)[:50]}")
         finally:
-            self.log_debug("Finalizing command lifecycle. Resetting state.")
-            self.is_running = False
-            
-            # If in continuous mode and we haven't been told to stop, loop back
-            if self.continuous_mode and not self.should_stop_listening:
-                self.log_debug("Continuous loop: Re-engaging listener.")
-                time.sleep(0.5) # Short breathing room
-                self.start_voice_thread()
-            else:
-                self.log_debug("Exiting continuous mode. Returning to Standby (Aware).")
-                self.ui.status_label.configure(text="NETWORK STATUS: STANDBY (AWARE)", text_color=self.ui.secondary_teal)
+            self._finalize_command()
 
     def boot_sequence(self):
         # Thematic startup logs and voice
